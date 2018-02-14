@@ -1,0 +1,47 @@
+{
+	"name": "polymerts-to-polymer-decorators",
+	"version": "0.1.0",
+	"description": "This is a tool to convert a PolymerTS project to a polymer-decorators project",
+	"main": "index.js",
+	"scripts": {
+		"compile": "tsc",
+		"build": "tsc --outDir ./",
+		"test": "echo \"Error: no test specified\" && exit 1"
+	},
+	"keywords": [
+		"polymerts",
+		"polymer",
+		"polymer-decorators"
+	],
+	"author": {
+		"name": "Keith Strickland",
+		"email": "keith@redpillnow.com",
+		"url": "http://keithstric.me"
+	},
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/RedPillNow/polymerts-to-polymer-decorators"
+	},
+	"bugs": {
+		"url": "https://github.com/RedPillNow/polymerts-to-polymer-decorators/issues"
+	},
+	"license": "Apache-2.0",
+	"devDependencies": {
+		"@types/node": "^9.4.5",
+		"del": "^3.0.0",
+		"gulp": "^3.9.1",
+		"gulp-bump": "^3.1.0",
+		"gulp-color": "0.0.1",
+		"gulp-ignore": "^2.0.2",
+		"gulp-sourcemaps": "^2.6.4",
+		"gulp-typescript": "^4.0.1",
+		"merge-stream": "^1.0.1",
+		"typescript": "^2.7.1"
+	},
+	"dependencies": {
+		"glob": "^7.1.2",
+		"htmlparser2": "^3.9.2",
+		"polymer-typescript-models": "git+https://keithstric:Str1ckland2@bitbucket.org/redpilldev/polymer-typescript-models.git",
+		"polymerts-typescript-models": "git+https://keithstric:Str1ckland2@bitbucket.org/redpilldev/polymer-typescript-models.git"
+	}
+}

@@ -1,0 +1,7 @@
+src
+node_modules
+test
+gulpfile.js
+tsconfig.json
+.gitignore
+.vscode

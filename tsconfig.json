@@ -1,0 +1,29 @@
+{
+	"compileOnSave": true,
+	"compilerOptions": {
+		"target": "es5",
+		"module": "commonjs",
+		"lib": [
+			"dom",
+			"es6",
+			"dom.iterable",
+			"scripthost"
+		],
+		"noImplicitAny": false,
+		"removeComments": true,
+		"preserveConstEnums": true,
+		"sourceMap": true,
+		"experimentalDecorators": true,
+		"listFiles": true,
+		"noEmitOnError": true
+	},
+	"include": [
+		"src/**/*.ts",
+		"node_modules/polymer-typescript-models/**/*.d.ts"
+	],
+	"exclude": [
+		"node_modules/**/*.*",
+		"src/data/**/*.ts",
+		"src/*-orig*.*"
+	]
+}
