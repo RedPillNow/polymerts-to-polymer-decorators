@@ -24,23 +24,35 @@ let _options = null;
  * @param {any} pathGlob
  * @param {any} opts
  * @property {string} opts.outputPath
- * @property {any} opts.glob Options for the glob module
+ * @property {any} opts.glob Options for the glob module https://github.com/isaacs/node-glob#options
  */
 export function convertToPolymerDecorators(pathGlob, opts) {
-	let defaultOpts = {
-		outputPath: './polymerTsToPolymerDecoratorsOutput/',
-		glob: {
-			ignore: '**/bower_components/**/*.*'
-		}
-	};
-	_options = opts || defaultOpts;
-	_options.glob = opts.glob || defaultOpts.glob;
-
+	_setOptions(opts);
 	let procFiles = _getFileArray(pathGlob);
 	_parseTs(procFiles);
 	console.log('convertToPolymerDecorators, _components=', _components);
 }
-
+/**
+ * Setup the options object
+ * @param {any} opts
+ */
+function _setOptions(opts): void {
+	let defaultOpts = {
+		outputPath: './polymerTsToPolymerDecoratorsOutput/',
+		glob: {
+			ignore: [
+				'bower_components/**/*.*',
+				'node_components/**/*.*'
+			]
+		}
+	};
+	_options = opts || defaultOpts;
+	_options.glob = opts.glob || defaultOpts.glob;
+}
+/**
+ * Start parsing the Typescript files passed along in files
+ * @param {any} files array of file paths
+ */
 function _parseTs(files): void {
 	if (!files) {
 		throw new Error('No Files Defined!');
@@ -63,19 +75,22 @@ function _parseTs(files): void {
 					break;
 				case ts.SyntaxKind.PropertyDeclaration:
 					// console.log('_parseTs, Property declaration', node);
-					if (!component) {
-						console.log('Seems we encountered a property with no component');
+					let prop: ts.PropertyDeclaration = <ts.PropertyDeclaration>node;
+					if (prop && prop.decorators && prop.decorators.length > 0 && !component) {
+						console.log('Seems we encountered a property with no component', prop.name.getText());
 						break;
+					}else if (component) {
+						component = Object.assign(component, _initProperty(component, node));
 					}
-					component = Object.assign(component, _initProperty(component, node));
 					break;
 				case ts.SyntaxKind.MethodDeclaration:
 					// console.log('_parseTs, Method declaration', node);
+					let method: ts.MethodDeclaration = <ts.MethodDeclaration>node;
 					if (!component) {
-						console.log('Seems we encountered a property with no component');
+						console.log('Seems we encountered a property with no component', method.name.getText());
 						break;
 					}
-					// component = Object.assign(component, _initMethod(component, node));
+					component = Object.assign(component, _initMethod(component, node));
 					break;
 				case ts.SyntaxKind.ModuleDeclaration: // namespace declaration
 					// console.log('_parseTs, Module declaration', node);
@@ -87,25 +102,6 @@ function _parseTs(files): void {
 		};
 		parseNode(sourceFile);
 	}
-}
-
-/**
- * Populate the component with the values from the node
- * @param {ts.Node} node
- * @returns {Component}
- */
-function _initComponent(node: ts.Node): RedPill.Component {
-	let component: RedPill.Component = new RedPill.Component();
-	if (node && node.decorators && node.decorators.length > 0) {
-		let clazz: ts.ClassDeclaration = <ts.ClassDeclaration>node;
-		component.tsNode = node;
-		component.className = clazz.name.getText();
-		// component.startLineNum = RedPill.getStartLineNumber(node);
-		// component.endLineNum = RedPill.getEndLineNumber(node);
-		component.comment ? component.comment.isFor = RedPill.ProgramType.Component : null;
-		component = Object.assign(component, _processComponentDecorators(component, node));
-	}
-	return component;
 }
 /**
  * Process a component's decorators. These should only be behaviors, at least that's all
@@ -141,7 +137,30 @@ function _processComponentDecorators(component: RedPill.Component, node: ts.Node
 	}
 	return component;
 }
-
+/**
+ * Populate the component with the values from the node
+ * @param {ts.Node} node
+ * @returns {RedPill.Component}
+ */
+function _initComponent(node: ts.Node): RedPill.Component {
+	let component: RedPill.Component = new RedPill.Component();
+	if (node && node.decorators && node.decorators.length > 0) {
+		let clazz: ts.ClassDeclaration = <ts.ClassDeclaration>node;
+		component.tsNode = node;
+		component.className = clazz.name.getText();
+		// component.startLineNum = RedPill.getStartLineNumber(node);
+		// component.endLineNum = RedPill.getEndLineNumber(node);
+		component.comment ? component.comment.isFor = RedPill.ProgramType.Component : null;
+		component = Object.assign(component, _processComponentDecorators(component, node));
+	}
+	return component;
+}
+/**
+ * Build a property and push to the _properties array
+ * @param {RedPill.Component} component
+ * @param {ts.Node} node
+ * @returns {RedPill.Component}
+ */
 function _initProperty(component: RedPill.Component, node: ts.Node): RedPill.Component {
 	if (node && node.kind === ts.SyntaxKind.PropertyDeclaration) {
 		let prop = null;
@@ -190,21 +209,27 @@ function _initProperty(component: RedPill.Component, node: ts.Node): RedPill.Com
  * Build a function and add to the component. However, if our function
  * is an observer, computed property, listener, etc. Build the proper object
  * and push it to the proper array
+ * @param {RedPill.Component} component
  * @param {ts.Node} node
+ * @returns {RedPill.Component}
  */
-/* function _initMethod(component: RedPill.Component, node: ts.Node): RedPill.Component {
+function _initMethod(component: RedPill.Component, node: ts.Node): RedPill.Component {
 	if (node && node.kind === ts.SyntaxKind.MethodDeclaration) {
+		let _functions = component.methods || [];
+		let _properties = component.properties || [];
+		let _listeners = component.listeners || [];
+		let _observers = component.observers || [];
 		let method: ts.MethodDeclaration = <ts.MethodDeclaration>node;
 		// console.log('_getMethod for', method.name.getText(), ts.getLineAndCharacterOfPosition(node.getSourceFile(), node.getStart()));
 		if (RedPill.isComputedProperty(method)) {
-			let computed: RedPill.ComputedProperty = _getComputedProperty(method);
+			let computed: RedPill.ComputedProperty = _initComputedProperty(method);
 			if (computed) {
 				let computedMethod = RedPill.getMethodFromComputed(computed);
 				_functions.push(computedMethod);
 				_properties.push(computed);
 			}
 		} else if (RedPill.isListener(method)) {
-			let listener: Listener = _getListener(method);
+			let listener: RedPill.Listener = _initListener(method);
 			if (listener) {
 				if (listener.methodName) {
 					let listenerMethod = RedPill.getMethodFromListener(listener);
@@ -213,12 +238,12 @@ function _initProperty(component: RedPill.Component, node: ts.Node): RedPill.Com
 				_listeners.push(listener);
 			}
 		} else if (RedPill.isObserver(method)) {
-			let observer: Observer = _getObserver(method);
+			let observer: RedPill.Observer = _initObserver(method);
 			if (observer) {
 				let observerMethod = RedPill.getMethodFromObserver(observer);
 				_functions.push(observerMethod);
 				if ((observer.properties && observer.properties.length === 1) && observer.properties[0].indexOf('.') === -1) {
-					let property: Property = findProperty(observer.properties[0]);
+					let property: RedPill.Property = findProperty(component, observer.properties[0]);
 					try {
 						let propertyParamObj = RedPill.getObjectFromString(property.params);
 						propertyParamObj.observer = observer.methodName;
@@ -231,20 +256,25 @@ function _initProperty(component: RedPill.Component, node: ts.Node): RedPill.Com
 				}
 			}
 		} else {
-			let func: Function = _getFunction(method);
+			let func: RedPill.Function = _initFunction(method);
 			if (func) {
 				_functions.push(func);
 			}
 		}
+		component.listeners = _listeners;
+		component.properties = _properties;
+		component.observers = _observers;
+		component.methods = _functions;
 	}
-} */
+	return component;
+}
 /**
  * Get a computed property if the node is a ComputedProperty
  * @param {ts.MethodDeclaration} node
- * @returns {ComputedProperty}
+ * @returns {RedPill.ComputedProperty}
  * @todo Need to create the function
  */
-function _getComputedProperty(node: ts.MethodDeclaration): RedPill.ComputedProperty {
+function _initComputedProperty(node: ts.MethodDeclaration): RedPill.ComputedProperty {
 	if (node) {
 		let computed: RedPill.ComputedProperty = new RedPill.ComputedProperty();
 		computed.tsNode = node;
@@ -264,6 +294,108 @@ function _getComputedProperty(node: ts.MethodDeclaration): RedPill.ComputedPrope
 		};
 		parseChildren(node);
 		return computed;
+	}
+	return null;
+}
+/**
+ * Get a function if the node is a MethodDeclaration and is not a
+ * computed property, observer, listener, etc. Also, it's parent must be
+ * the "component's" node
+ * @param {ts.MethodDeclaration} node
+ * @returns {RedPill.Function}
+ */
+function _initFunction(node: ts.MethodDeclaration): RedPill.Function {
+	if (node) {
+		let func: RedPill.Function = new RedPill.Function();
+		func.tsNode = node;
+		func.methodName = node.name.getText();;
+		func.startLineNum = RedPill.getStartLineNumber(node);
+		func.endLineNum = RedPill.getEndLineNumber(node);
+		let params = [];
+		let parseChildren = (childNode: ts.Node) => {
+			// console.log('_getFunction.parseChildren.childNode.kind=', (<any>ts).SyntaxKind[childNode.kind], '=', childNode.kind)
+			if (childNode.kind === ts.SyntaxKind.Parameter && childNode.parent === node) {
+				let param = <ts.ParameterDeclaration>childNode;
+				params.push(childNode.getText().replace(/\??:\s*[a-zA-Z]*/g, ''));
+			}
+			ts.forEachChild(childNode, parseChildren);
+		}
+		parseChildren(node);
+		func.comment ? func.comment.isFor = RedPill.ProgramType.Function : null;
+		func.parameters = params;
+		return func;
+	}
+	return null;
+}
+/**
+ * Get a Listener if the node is a listener
+ *
+ * @param {ts.MethodDeclaration} node
+ * @returns {RedPill.Listener}
+ */
+function _initListener(node: ts.MethodDeclaration): RedPill.Listener {
+	if (node) {
+		let listener: RedPill.Listener = new RedPill.Listener();
+		listener.tsNode = node;
+		listener.methodName = node.name.getText();
+		listener.startLineNum = RedPill.getStartLineNumber(node);
+		listener.endLineNum = RedPill.getEndLineNumber(node);
+		listener.comment ? listener.comment.isFor = RedPill.ProgramType.Listener : null;
+		if (node.decorators && node.decorators.length > 0) {
+			node.decorators.forEach((decorator: ts.Decorator, idx) => {
+				let parseChildren = (decoratorChildNode) => {
+					let kindStr = (<any>ts).SyntaxKind[decoratorChildNode.kind] + '=' + decoratorChildNode.kind;
+					switch (decoratorChildNode.kind) {
+						case ts.SyntaxKind.StringLiteral:
+							let listenerStrNode = <ts.StringLiteral>decoratorChildNode;
+							listener.eventDeclaration = listenerStrNode.getText();
+							break;
+						case ts.SyntaxKind.PropertyAccessExpression:
+							let listenerPropAccExp = <ts.PropertyAccessExpression>decoratorChildNode;
+							listener.eventDeclaration = listenerPropAccExp.getText();
+							listener.isExpression = true;
+							break;
+					};
+					ts.forEachChild(decoratorChildNode, parseChildren);
+				};
+				parseChildren(decorator);
+			});
+		}
+		let sigArr: string[] = listener.eventDeclaration ? listener.eventDeclaration.split('.') : [];
+		listener.eventName = sigArr[1] || null;
+		listener.elementId = listener.eventName ? sigArr[0] : null;
+		return listener;
+	}
+	return null;
+}
+/**
+ * Get an observer object if the node is an Observer
+ * @param {ts.MethodDeclaration} node
+ * @returns {RedPill.Observer}
+ */
+function _initObserver(node: ts.MethodDeclaration): RedPill.Observer {
+	if (node) {
+		let observer: RedPill.Observer = new RedPill.Observer();
+		observer.tsNode = node;
+		observer.startLineNum = RedPill.getStartLineNumber(node);
+		observer.endLineNum = RedPill.getEndLineNumber(node);
+		observer.methodName = node.name.getText();
+		observer.comment ? observer.comment.isFor = RedPill.ProgramType.Observer : null;
+		if (node.decorators && node.decorators.length > 0) {
+			node.decorators.forEach((decorator: ts.Decorator, idx) => {
+				let parseChildren = (decoratorChildNode: ts.Node) => {
+					if (decoratorChildNode.kind === ts.SyntaxKind.StringLiteral) {
+						let observerStrNode = <ts.StringLiteral>decoratorChildNode;
+						let propsStr = observerStrNode.getText();
+						propsStr = propsStr.replace(/[\s']*/g, '');
+						observer.properties = propsStr.split(',');
+					}
+					ts.forEachChild(decoratorChildNode, parseChildren);
+				};
+				parseChildren(decorator);
+			});
+		}
+		return observer;
 	}
 	return null;
 }
@@ -306,7 +438,28 @@ function _getPathInfo(fileName: string, docPath: string): PathInfo {
 	}
 	return pathInfo;
 }
+/**
+ * Find a property in the _properties array by it's name
+ * @param {RedPill.Component} component
+ * @param {string} propertyName
+ * @returns {Property}
+ */
+function findProperty(component: RedPill.Component, propertyName: string): RedPill.Property {
+	let prop = null;
+	let _properties = component.properties;
+	if (_properties && _properties.length > 0) {
+		prop = _properties.find((prop: RedPill.Property, idx) => {
+			return prop.name === propertyName;
+		});
+	}
+	return prop;
+}
 
 // For dev purposes only. MUST be removed before deployment/release
-convertToPolymerDecorators('src/data/**/*.ts', {outputPath: './docs/'});
+convertToPolymerDecorators('src/data/**/*.ts', {
+	outputPath: './docs/',
+	glob: {
+		ignore: ['**/bower_components/**/*.*', 'src/data/app/dig/**/*.*']
+	}
+});
 // convertToPolymerDecorators(['src/data/app/elements/dig-app/*.ts', 'src/data/app/elements/dig-app-site/*.ts'], {outputPath: './docs/'});

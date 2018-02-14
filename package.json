@@ -41,7 +41,6 @@
 	"dependencies": {
 		"glob": "^7.1.2",
 		"htmlparser2": "^3.9.2",
-		"polymer-typescript-models": "git+https://keithstric:Str1ckland2@bitbucket.org/redpilldev/polymer-typescript-models.git",
-		"polymerts-typescript-models": "git+https://keithstric:Str1ckland2@bitbucket.org/redpilldev/polymer-typescript-models.git"
+		"polymer-typescript-models": "git+https://keithstric:Str1ckland2@bitbucket.org/redpilldev/polymer-typescript-models.git"
 	}
 }
