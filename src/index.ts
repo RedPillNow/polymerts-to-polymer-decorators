@@ -30,7 +30,9 @@ export function convertToPolymerDecorators(pathGlob: string | string[], opts?: a
  */
 function _setOptions(opts): any {
 	let defaultOpts = {
+		changeInline: false,
 		outputPath: './polymerTsToPolymerDecoratorsOutput/',
+		useMetadataReflection: false,
 		glob: {
 			ignore: [
 				'bower_components/**/*.*',
@@ -62,6 +64,7 @@ export function parseTs(files): RedPill.Component[] {
 						component = new RedPill.Component(<ts.ClassDeclaration>node);
 						component.namespace = namespace;
 						component.comment ? component.comment.isFor = RedPill.ProgramType.Component : null;
+						component.useMetadataReflection = _options.useMetadataReflection;
 						components.push(component);
 					}
 					break;
