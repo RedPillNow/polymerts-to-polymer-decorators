@@ -33,6 +33,7 @@ function _setOptions(opts): any {
 		changeInline: false,
 		outputPath: './polymerTsToPolymerDecoratorsOutput/',
 		useMetadataReflection: false,
+		conversionType: 'polymer-decorators',
 		glob: {
 			ignore: [
 				'bower_components/**/*.*',
