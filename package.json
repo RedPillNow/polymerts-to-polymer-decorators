@@ -41,6 +41,7 @@
 	"dependencies": {
 		"glob": "^7.1.2",
 		"htmlparser2": "^3.9.2",
-		"polymer-typescript-models": "git+https://github.com/RedPillNow/polymerts-models.git"
+		"polymerts-models": "git+https://github.com/RedPillNow/polymerts-models.git",
+		"replace-in-file": "^3.4.0"
 	}
 }

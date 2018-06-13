@@ -1,15 +1,17 @@
 'use strict';
 
 import * as fs from 'fs';
-import * as path from 'path';
 import * as ts from 'typescript';
-import {RedPill} from 'polymer-typescript-models';
+import {RedPill} from 'polymerts-models';
 import * as glob from 'glob';
+import * as modifier from './utils/component-modifer';
+import * as Types from './custom-types';
 
 let _options = null;
+let _procFiles: any[] = [];
 
 /**
- * Converts polymerTs files found in the pathGlob to use the polymer-decorators made available
+ * Converts polymerTs decorators found in the pathGlob to use the polymer-decorators made available
  * in Polymer 2.4
  * @export
  * @param {any} pathGlob
@@ -17,12 +19,34 @@ let _options = null;
  * @property {string} opts.outputPath The directory where all files will be dumped
  * @property {any} opts.glob Options for the glob module https://github.com/isaacs/node-glob#options
  */
-export function convertToPolymerDecorators(pathGlob: string | string[], opts?: any) {
-	let options = _setOptions(opts);
+export function updateDecorators(pathGlob: string | string[], opts?: any) {
+	let options = opts ? _setOptions(opts) : _options;
 	_options = options;
-	let procFiles = _getFileArray(pathGlob);
-	let components = parseTs(procFiles);
-	console.log('convertToPolymerDecorators, _components=', components);
+	_procFiles = pathGlob ? _getFileArray(pathGlob) : _procFiles;
+	let components = parseTs(_procFiles);
+	for (let i = 0; i < components.length; i++) {
+		let component: RedPill.Component = components[i];
+		// _modifyDecorators(component, Types.PolymerDecorators.CUSTOMELEMENT);
+		modifier.modifyDecorators(component, Types.PolymerDecorators.COMPUTED);
+	}
+}
+
+
+/**
+ * Get an array of RedPill.Component objects from the pathGlob
+ * @export
+ * @param {any} pathGlob
+ * @param {any} opts
+ * @property {string} opts.outputPath The directory where all files will be dumped
+ * @property {any} opts.glob Options for the glob module https://github.com/isaacs/node-glob#options
+ * @returns {RedPill.Component[]}
+ */
+export function getComponents(pathGlob: string | string[], opts?: any) {
+	let options = opts ? _setOptions(opts) : _options;
+	_options = options;
+	_procFiles = pathGlob ? _getFileArray(pathGlob) : _procFiles;
+	let components = parseTs(_procFiles);
+	return components;
 }
 /**
  * Setup the options object
@@ -45,8 +69,8 @@ function _setOptions(opts): any {
 }
 /**
  * Start parsing the Typescript files passed along in files
- * @param {any} files array of file paths
- * @return {RedPill.Component[]}
+ * @param {any} files - array of file paths
+ * @returns {RedPill.Component[]}
  */
 export function parseTs(files): RedPill.Component[] {
 	if (!files) {
@@ -100,10 +124,16 @@ function _getFileArray(pathGlob) {
 
 // For dev purposes only. MUST be removed before deployment/release
 
-// convertToPolymerDecorators('src/data/**/*.ts', {
+// getComponents('src/data/**/*.ts', {
 // 	outputPath: './docs/',
 // 	glob: {
 // 		ignore: ['**/bower_components/**/*.*', 'src/data/app/dig/**/*.*']
 // 	}
 // });
-convertToPolymerDecorators(['src/data/app/elements/dig-app-site/*.ts', 'src/data/app/elements/dig-app/*.ts'], {outputPath: './docs/'});
+let files = [
+	// 'src/data/app/elements/dig-app-site/*.ts',
+	'src/data/app/elements/dig-app/*.ts',
+	// 'src/data/app/elements/dig-animated-pages-behavior/*.ts'
+];
+// getComponents(files, {outputPath: './docs/'});
+updateDecorators(files, {outputPath: './docs/'});
