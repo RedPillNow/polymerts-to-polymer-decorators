@@ -35,7 +35,7 @@ let options = {
 		ignore: [
 			'test/**/*.*',
 			'bower_components/**/*.*',
-			'node_modules/**/*.*
+			'node_modules/**/*.*'
 		]
 	};
 toPolymerDecorators.convertToPolymerDecorators('src/**/*.ts', options);
