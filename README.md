@@ -33,7 +33,7 @@ let options = {
 	useMetadataReflection: true,
 	glob: {
 		ignore: [
-			'test/**/*.*,
+			'test/**/*.*',
 			'bower_components/**/*.*',
 			'node_modules/**/*.*
 		]
