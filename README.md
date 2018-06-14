@@ -37,7 +37,8 @@ let options = {
 			'bower_components/**/*.*',
 			'node_modules/**/*.*'
 		]
-	};
+	}
+}
 toPolymerDecorators.convertToPolymerDecorators('src/**/*.ts', options);
 ```
 
