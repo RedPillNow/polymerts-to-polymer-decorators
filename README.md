@@ -2,6 +2,8 @@
 
 This project is a tool to convert a [PolymerTS](https://github.com/nippur72/PolymerTS#observe) element into a [polymer-decorator](https://github.com/Polymer/polymer-decorators#observetargets-string) element.
 
+**NOTE**: This project is still under development and no where near ready for use.
+
 ## Installation
 
 ```cli
@@ -43,6 +45,8 @@ toPolymerDecorators.convertToPolymerDecorators('src/**/*.ts', options);
 ```
 
 ## Options
+
+**_Coming Soon_**
 
 ## Contributing
 
