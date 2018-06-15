@@ -1,11 +1,15 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import * as Types from '../custom-types';
 import {RegExModule} from '../regular-expressions';
 import * as replace from 'replace-in-file';
 import {RedPill} from 'polymerts-models';
 import {Stream, TransformOptions} from 'stream';
 
-export function modifyDecorators(component: RedPill.Component, type: Types.PolymerDecorators) {
+let _options = null;
+
+export function modifyDecorators(component: RedPill.Component, type: Types.PolymerDecorators, options) {
+	_options = options;
 	if (component && type) {
 		let replaceOpts: any = {
 			files: component.filePath,
@@ -34,20 +38,21 @@ export function modifyDecorators(component: RedPill.Component, type: Types.Polym
 
 function _modifyComputedProperty(computedProp: RedPill.ComputedProperty) {
 	if (computedProp) {
-		let readStream = fs.createReadStream(computedProp.filePath);
 		let transformStream = new TransformComputedProperty({objectMode: true});
 		transformStream.startLine = computedProp.startLineNum;
 		transformStream.endLine = computedProp.endLineNum;
+		transformStream.computedProp = computedProp;
 
-		readStream.pipe(transformStream)
-		let lineCount = 1;
-		transformStream.on('readable', () => {
-			let line = null;
-			while (null !== (line = transformStream.read())) {
-				console.log('line #' + lineCount + ': ' + line);
-			}
-			lineCount++;
-		});
+		let filePath = computedProp.filePath;
+		if (_options && _options.outputPath) {
+			filePath = path.join(_options.outputPath,computedProp.fileName);
+		}
+
+		//let writeStream = fs.createWriteStream(filePath);
+		let readStream = fs.createReadStream(computedProp.filePath)
+			.pipe(transformStream)
+			//.pipe(writeStream);
+
 	}
 }
 
@@ -66,6 +71,7 @@ class TransformComputedProperty extends BaseTransform {
 	private _lastLineData: any;
 	startLine: number;
 	endLine: number;
+	computedProp: RedPill.ComputedProperty;
 
 	constructor(opts: TransformOptions) {
 		super(opts);
@@ -76,22 +82,28 @@ class TransformComputedProperty extends BaseTransform {
 		if (this._lastLineData) {
 			data = this._lastLineData + data;
 		}
+		// Entire file by line
 		let lines = data.split('\n');
-		let concernedLines = lines.slice(this.startLine -1, this.endLine -1);
-
-		// Prevent lines being broken in the middle of the line
-		this._lastLineData = concernedLines.splice(concernedLines.length -1, 1)[0];
-		concernedLines.forEach((line, idx) => {
-			let newLine = line;
-			// Send line to stream
-			this.push(newLine);
-		});
+		// Replacement Text for Computed Property
+		let replacementTextArr = this.computedProp.polymerDecoratorSignature.split('\n');
+		lines.forEach((line, idx) => {
+			if (idx === this.startLine -1) {
+				// Remove old, add new
+				let removeLineCount = (this.endLine - this.startLine) + 1;
+				let removedItems = lines.splice(idx, removeLineCount);
+				console.log('removed: ', JSON.stringify(removedItems));
+				// Array.prototype.splice.apply(lines, [idx, 0].concat(replacementTextArr));
+				lines.splice(idx, 0, ...replacementTextArr);
+				console.log('added: ', JSON.stringify(replacementTextArr));
+			}
+		})
+		this.push(lines.join('\n'));
 		done();
 	}
 
 	_flush(done: Function) {
 		if (this._lastLineData) {
-			this.push(this._lastLineData);
+			// this.push(this._lastLineData);
 		}
 		this._lastLineData = null;
 		done();

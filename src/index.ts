@@ -27,7 +27,7 @@ export function updateDecorators(pathGlob: string | string[], opts?: any) {
 	for (let i = 0; i < components.length; i++) {
 		let component: RedPill.Component = components[i];
 		// _modifyDecorators(component, Types.PolymerDecorators.CUSTOMELEMENT);
-		modifier.modifyDecorators(component, Types.PolymerDecorators.COMPUTED);
+		modifier.modifyDecorators(component, Types.PolymerDecorators.COMPUTED, _options);
 	}
 }
 
