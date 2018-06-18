@@ -1,52 +1,58 @@
-'use strict';
-
 import * as fs from 'fs';
 import * as ts from 'typescript';
-import {RedPill} from 'polymerts-models';
+import transform from './utils/transform';
 import * as glob from 'glob';
-import * as modifier from './utils/component-modifer';
-import * as Types from './custom-types';
+import * as rimraf from 'rimraf';
+import * as chalk from './utils/chalkConfig';
 
 let _options = null;
-let _procFiles: any[] = [];
+let _procFiles = [];
 
-/**
- * Converts polymerTs decorators found in the pathGlob to use the polymer-decorators made available
- * in Polymer 2.4
- * @export
- * @param {any} pathGlob
- * @param {any} opts
- * @property {string} opts.outputPath The directory where all files will be dumped
- * @property {any} opts.glob Options for the glob module https://github.com/isaacs/node-glob#options
- */
-export function updateDecorators(pathGlob: string | string[], opts?: any) {
-	let options = opts ? _setOptions(opts) : _options;
-	_options = options;
-	_procFiles = pathGlob ? _getFileArray(pathGlob) : _procFiles;
-	let components = parseTs(_procFiles);
-	for (let i = 0; i < components.length; i++) {
-		let component: RedPill.Component = components[i];
-		// _modifyDecorators(component, Types.PolymerDecorators.CUSTOMELEMENT);
-		modifier.modifyDecorators(component, Types.PolymerDecorators.COMPUTED, _options);
+export default function updateSource(pathGlob: string | string[], options?: any) {
+	console.log(chalk.success('Starting transformation of components...'));
+	let opts = options ? _setOptions(options) : _options;
+	_options = opts;
+	if (_options.outputPath) {
+		console.log(chalk.success('Output files will be placed in: ' + _options.outputPath));
+		_updateOutputPath();
 	}
+	_procFiles = _getFileArray(pathGlob);
+	const compilerHost = ts.createCompilerHost(_options.compiler);
+	let allDiagnostics;
+	let emittedFiles = [];
+	for (let i = 0; i < _procFiles.length; i++) {
+		let file = _procFiles[i];
+		console.log(chalk.processing('Parsing File: ' + file + '...'));
+		const program = ts.createProgram(_procFiles, _options.compiler, compilerHost);
+		const msgs = {};
+		let emitResult = program.emit(undefined, undefined, undefined, undefined, {before: [transform()]});
+		emittedFiles.push(emitResult);
+		allDiagnostics = ts.getPreEmitDiagnostics(program).concat(emitResult.diagnostics);
+	}
+
+	allDiagnostics.forEach(diagnostic => {
+		let { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start)
+		let message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
+		console.log(`${diagnostic.file.fileName} (${line + 1},${character + 1}): ${message}`)
+	});
+	console.log('done compilng', JSON.stringify(emittedFiles));
 }
+function _getOutputFilePath(file: string) {
 
-
+}
 /**
- * Get an array of RedPill.Component objects from the pathGlob
- * @export
- * @param {any} pathGlob
- * @param {any} opts
- * @property {string} opts.outputPath The directory where all files will be dumped
- * @property {any} opts.glob Options for the glob module https://github.com/isaacs/node-glob#options
- * @returns {RedPill.Component[]}
+ * Create the output path
+ * @param pathGlob
  */
-export function getComponents(pathGlob: string | string[], opts?: any) {
-	let options = opts ? _setOptions(opts) : _options;
-	_options = options;
-	_procFiles = pathGlob ? _getFileArray(pathGlob) : _procFiles;
-	let components = parseTs(_procFiles);
-	return components;
+function _updateOutputPath() {
+	if (!fs.existsSync(_options.outputPath)) {
+		fs.mkdirSync(_options.outputPath.toString());
+		console.log(chalk.success('Created output directory: ' + _options.outputPath));
+	}else {
+		console.log(chalk.warning('Will delete the contents of ' + _options.outputPath));
+		rimraf.sync(_options.outputPath + '*');
+		console.log(chalk.success('Content of ' + _options.outputPath + ' deleted!'));
+	}
 }
 /**
  * Setup the options object
@@ -63,46 +69,19 @@ function _setOptions(opts): any {
 				'bower_components/**/*.*',
 				'node_components/**/*.*'
 			]
+		},
+		compiler: {
+			module: ts.ModuleKind.CommonJS,
+			moduleResolution: ts.ModuleResolutionKind.NodeJs,
+			noEmitOnError: false,
+			noUnusedLocals: true,
+			noUnusedParameters: true,
+			stripInternal: true,
+			target: ts.ScriptTarget.ES5,
+			experimentalDecorators: true
 		}
 	};
 	return Object.assign(defaultOpts, opts);
-}
-/**
- * Start parsing the Typescript files passed along in files
- * @param {any} files - array of file paths
- * @returns {RedPill.Component[]}
- */
-export function parseTs(files): RedPill.Component[] {
-	if (!files) {
-		throw new Error('No Files Defined!');
-	}
-	let components: RedPill.Component[] = [];
-	for (let i = 0; i < files.length; i++) {
-		let file = files[i];
-		let component: RedPill.Component = null;
-		let sourceFile = ts.createSourceFile(file, fs.readFileSync(file).toString(), ts.ScriptTarget.ES2015, true);
-		let namespace = null;
-		let parseNode = (node: ts.Node) => {
-			switch (node.kind) {
-				case ts.SyntaxKind.ClassDeclaration:
-					if (node.decorators && node.decorators.length > 0) {
-						component = new RedPill.Component(<ts.ClassDeclaration>node);
-						component.namespace = namespace;
-						component.comment ? component.comment.isFor = RedPill.ProgramType.Component : null;
-						component.useMetadataReflection = _options.useMetadataReflection;
-						components.push(component);
-					}
-					break;
-				case ts.SyntaxKind.ModuleDeclaration: // namespace declaration
-					let module: ts.ModuleDeclaration = <ts.ModuleDeclaration>node;
-					namespace = module.name.getText();
-					break;
-			};
-			ts.forEachChild(node, parseNode);
-		};
-		parseNode(sourceFile);
-	}
-	return components;
 }
 /**
  * Get an array of files from the glob passed in
@@ -136,4 +115,5 @@ let files = [
 	// 'src/data/app/elements/dig-animated-pages-behavior/*.ts'
 ];
 // getComponents(files, {outputPath: './docs/'});
-updateDecorators(files, {outputPath: './docs/'});
+updateSource(files, {outputPath: './docs/'});
+

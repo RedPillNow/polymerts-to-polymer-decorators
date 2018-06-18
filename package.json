@@ -39,9 +39,11 @@
 		"typescript": "^2.7.1"
 	},
 	"dependencies": {
+		"chalk": "^2.4.1",
 		"glob": "^7.1.2",
 		"htmlparser2": "^3.9.2",
 		"polymerts-models": "file:../polymer-typescript-models",
-		"replace-in-file": "^3.4.0"
+		"replace-in-file": "^3.4.0",
+		"rimraf": "^2.6.2"
 	}
 }

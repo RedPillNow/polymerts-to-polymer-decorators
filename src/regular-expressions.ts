@@ -2,7 +2,7 @@
 
 export module RegExModule {
 	export let polymerTSRegEx = {
-		component: /(\@component\s*\((?:['"]{1}(.*)['"]{1})\))/g,
+		component: /(component\s*\((?:['"]{1}(.*)['"]{1})\))/g,
 		extend: null,
 		property: /(\@property\s*\(({[a-zA-Z0-9:,\s]*})\)\s*([\w\W]*);)/g,
 		observe: /(\@observe\(([a-zA-Z0-9:,\s'".]*)?\))/,

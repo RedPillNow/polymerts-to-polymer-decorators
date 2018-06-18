@@ -1,14 +1,22 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import * as Types from '../custom-types';
-import {RegExModule} from '../regular-expressions';
-import * as replace from 'replace-in-file';
+import * as ts from 'typescript';
+// import * as Types from '../custom-types';
+// import {RegExModule} from '../regular-expressions';
+// import * as replace from 'replace-in-file';
 import {RedPill} from 'polymerts-models';
 import {Stream, TransformOptions} from 'stream';
 
 let _options = null;
 
-export function modifyDecorators(component: RedPill.Component, type: Types.PolymerDecorators, options) {
+export function transformSource(component: RedPill.Component, options) {
+	if (component && options) {
+		_options = options;
+
+	}
+}
+
+/* export function modifyDecorators(component: RedPill.Component, type: Types.PolymerDecorators, options) {
 	_options = options;
 	if (component && type) {
 		let replaceOpts: any = {
@@ -34,24 +42,28 @@ export function modifyDecorators(component: RedPill.Component, type: Types.Polym
 		};
 	}
 	return null;
-}
+} */
 
 function _modifyComputedProperty(computedProp: RedPill.ComputedProperty) {
 	if (computedProp) {
+		let writePath = computedProp.filePath;
+		let readPath = computedProp.filePath;
+		if (_options && _options.outputPath) {
+			writePath = path.join(_options.outputPath,computedProp.fileName);
+		}
+		if (!fs.existsSync(writePath)) {
+			fs.closeSync(fs.openSync(writePath, 'w'));
+		}else {
+			readPath = path.join(_options.outputPath, computedProp.fileName);
+		}
 		let transformStream = new TransformComputedProperty({objectMode: true});
 		transformStream.startLine = computedProp.startLineNum;
 		transformStream.endLine = computedProp.endLineNum;
 		transformStream.computedProp = computedProp;
-
-		let filePath = computedProp.filePath;
-		if (_options && _options.outputPath) {
-			filePath = path.join(_options.outputPath,computedProp.fileName);
-		}
-
-		//let writeStream = fs.createWriteStream(filePath);
-		let readStream = fs.createReadStream(computedProp.filePath)
+		let writeStream = fs.createWriteStream(writePath);
+		let readStream = fs.createReadStream(readPath)
 			.pipe(transformStream)
-			//.pipe(writeStream);
+			.pipe(writeStream);
 
 	}
 }
@@ -96,8 +108,9 @@ class TransformComputedProperty extends BaseTransform {
 				lines.splice(idx, 0, ...replacementTextArr);
 				console.log('added: ', JSON.stringify(replacementTextArr));
 			}
-		})
-		this.push(lines.join('\n'));
+		});
+		let newText = lines.join('\n');
+		this.push(newText);
 		done();
 	}
 
