@@ -67,7 +67,7 @@ function _setOptions(opts): any {
 		glob: {
 			ignore: [
 				'bower_components/**/*.*',
-				'node_components/**/*.*'
+				'node_modules/**/*.*'
 			]
 		},
 		compiler: {

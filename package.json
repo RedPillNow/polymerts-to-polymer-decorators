@@ -35,8 +35,7 @@
 		"gulp-ignore": "^2.0.2",
 		"gulp-sourcemaps": "^2.6.4",
 		"gulp-typescript": "^4.0.1",
-		"merge-stream": "^1.0.1",
-		"typescript": "^2.7.1"
+		"merge-stream": "^1.0.1"
 	},
 	"dependencies": {
 		"chalk": "^2.4.1",
@@ -44,6 +43,7 @@
 		"htmlparser2": "^3.9.2",
 		"polymerts-models": "file:../polymer-typescript-models",
 		"replace-in-file": "^3.4.0",
-		"rimraf": "^2.6.2"
+		"rimraf": "^2.6.2",
+		"typescript": "^2.9.2"
 	}
 }
