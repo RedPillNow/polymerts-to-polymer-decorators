@@ -97,7 +97,7 @@ class TransformComputedProperty extends BaseTransform {
 		// Entire file by line
 		let lines = data.split('\n');
 		// Replacement Text for Computed Property
-		let replacementTextArr = this.computedProp.polymerDecoratorSignature.split('\n');
+		/* let replacementTextArr = this.computedProp.polymerDecoratorSignature.split('\n');
 		lines.forEach((line, idx) => {
 			if (idx === this.startLine -1) {
 				// Remove old, add new
@@ -108,7 +108,7 @@ class TransformComputedProperty extends BaseTransform {
 				lines.splice(idx, 0, ...replacementTextArr);
 				console.log('added: ', JSON.stringify(replacementTextArr));
 			}
-		});
+		}); */
 		let newText = lines.join('\n');
 		this.push(newText);
 		done();

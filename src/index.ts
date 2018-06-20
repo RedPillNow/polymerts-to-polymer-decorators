@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as ts from 'typescript';
-import transform from './utils/transform';
+import {TypescriptNodeEmitter} from './utils/transform';
 import * as glob from 'glob';
 import * as rimraf from 'rimraf';
 import * as chalk from './utils/chalkConfig';
@@ -18,28 +18,23 @@ export default function updateSource(pathGlob: string | string[], options?: any)
 	}
 	_procFiles = _getFileArray(pathGlob);
 	const compilerHost = ts.createCompilerHost(_options.compiler);
-	let allDiagnostics;
-	let emittedFiles = [];
+	// generatedFiles is a map with the original source file as the key
+	// and the new sourcefile as the value
+	let generatedFiles: Map<ts.SourceFile, ts.SourceFile> = new Map();
 	for (let i = 0; i < _procFiles.length; i++) {
 		let file = _procFiles[i];
 		console.log(chalk.processing('Parsing File: ' + file + '...'));
 		const program = ts.createProgram(_procFiles, _options.compiler, compilerHost);
-		const msgs = {};
-		let emitResult = program.emit(undefined, undefined, undefined, undefined, {before: [transform()]});
-		emittedFiles.push(emitResult);
-		allDiagnostics = ts.getPreEmitDiagnostics(program).concat(emitResult.diagnostics);
+		const sourceFile = program.getSourceFile(file);
+		let emitter = new TypescriptNodeEmitter();
+
+		let newSourceFile = emitter.getSourceMap(sourceFile)
+		generatedFiles.set(sourceFile, newSourceFile[0]);
 	}
-
-	allDiagnostics.forEach(diagnostic => {
-		let { line, character } = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start)
-		let message = ts.flattenDiagnosticMessageText(diagnostic.messageText, '\n')
-		console.log(`${diagnostic.file.fileName} (${line + 1},${character + 1}): ${message}`)
-	});
-	console.log('done compilng', JSON.stringify(emittedFiles));
+	console.log('done compilng', JSON.stringify(generatedFiles.entries));
 }
-function _getOutputFilePath(file: string) {
 
-}
+
 /**
  * Create the output path
  * @param pathGlob
@@ -110,6 +105,7 @@ function _getFileArray(pathGlob) {
 // 	}
 // });
 let files = [
+	// 'src/data/app/elements/dig-person-avatar/*.ts',
 	// 'src/data/app/elements/dig-app-site/*.ts',
 	'src/data/app/elements/dig-app/*.ts',
 	// 'src/data/app/elements/dig-animated-pages-behavior/*.ts'
