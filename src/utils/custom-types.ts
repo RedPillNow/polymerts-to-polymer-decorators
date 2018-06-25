@@ -1,3 +1,5 @@
+import * as ts from 'typescript';
+
 export enum PolymerDecorators {
 	CUSTOMELEMENT = '@customElement',
 	PROPERTY = '@property',
@@ -6,6 +8,19 @@ export enum PolymerDecorators {
 	QUERY = '@query',
 	QUERYALL = '@queryAll',
 	LISTEN = '@listen'
+}
+
+export interface ConverterOptions {
+	changeInline: boolean,
+	outputPath: string,
+	useMetadataReflection: boolean,
+	conversionType?: 'polymer-decorators',
+	targetPolymerVersion?: 2|3,
+	moveSinglePropertyObserversToProperty: boolean,
+	applyDeclarativeEventListenersMixin: boolean,
+	applyGestureEventListenersMixin: boolean,
+	glob: any,
+	compiler: ts.CompilerOptions
 }
 
 export interface DecoratedElement {
@@ -48,4 +63,16 @@ export interface QueryAll extends DecoratedElement {
 export interface Listen extends DecoratedElement {
 	eventName: string;
 	target: string | EventTarget;
+}
+
+export enum ChangeType {
+	PropertyChange,
+	PropertyAddition
+}
+export interface PostTransformChangeRecord {
+	origNode: ts.Node;
+	changeType: ChangeType
+	newNode: ts.Node,
+	removeNode?: ts.Node,
+	removeDecorator?: ts.Decorator
 }

@@ -5,8 +5,9 @@ import {PolymerTsTransformer, PolymerTsTransformerFactory} from './utils/transfo
 import * as glob from 'glob';
 import * as rimraf from 'rimraf';
 import * as chalk from './utils/chalkConfig';
+import {ConverterOptions} from './utils/custom-types';
 
-let _options: any = null; // TODO: Make this a Type/Interface
+let _options: ConverterOptions = null;
 let _procFiles: string[] = [];
 let _generatedFiles: Map<ts.SourceFile, ts.SourceFile> = new Map();
 
@@ -33,18 +34,22 @@ export default function updateSource(pathGlob: string | string[], options?: any)
 		console.log(chalk.processing('Parsing File: ' + file + '...'));
 		const program: ts.Program = ts.createProgram([file], compilerOpts, compilerHost);
 		const sourceFile: ts.SourceFile = program.getSourceFile(file);
-		const transformerFactory = new PolymerTsTransformerFactory(sourceFile);
+		const transformerFactory = new PolymerTsTransformerFactory(sourceFile, _options, 2);
 		const transform = transformerFactory.transform;
 		const result: ts.TransformationResult<ts.SourceFile> = ts.transform(sourceFile, [transform.bind(transformerFactory)], compilerOpts);
 		const newSourceFile: ts.SourceFile = result.transformed[0];
 		_generatedFiles.set(sourceFile, newSourceFile);
 		const printer: ts.Printer = ts.createPrinter({newLine: ts.NewLineKind.LineFeed});
 		const outputText: string = printer.printFile(newSourceFile);
-		console.log('done compilng ' + file + 'output=', outputText);
+		console.log('done compilng' + file);
 		_writeSourceFile(file, outputText);
 	}
 }
-
+/**
+ * Write the transformed output to a new file
+ * @param {string} file the full path to the current source file
+ * @param {string} outputText the output text of the new file
+ */
 function _writeSourceFile(file: string, outputText: string) {
 	let fileName = path.basename(file);
 	let outputPath = path.join(_options.outputPath, fileName);
@@ -69,12 +74,16 @@ function _updateOutputPath() {
  * Setup the options object
  * @param {any} opts user provided options
  */
-function _setOptions(opts): any {
-	let defaultOpts = {
+function _setOptions(opts): ConverterOptions {
+	let defaultOpts: ConverterOptions = {
 		changeInline: false,
 		outputPath: './polymerTsToPolymerDecoratorsOutput/',
 		useMetadataReflection: false,
 		conversionType: 'polymer-decorators',
+		targetPolymerVersion: 2,
+		moveSinglePropertyObserversToProperty: true,
+		applyDeclarativeEventListenersMixin: true,
+		applyGestureEventListenersMixin: false,
 		glob: {
 			ignore: [
 				'bower_components/**/*.*',
