@@ -8,40 +8,44 @@ export enum PolymerDecorators {
 	LISTEN = '@listen'
 }
 
-export type CustomElement = {
+export interface DecoratedElement {
 	tagname?: string
 }
 
-export type Property = {
+export interface CustomElement extends DecoratedElement {
+	behaviors?: string[];
+}
+
+export interface Property extends DecoratedElement {
 	options?: PropertyObjects
 }
 
-export type PropertyObjects = {
-	type: string,
-	notify?: boolean,
-	readOnly?: boolean,
-	reflectToAttribute?: boolean,
-	computed?: string,
-	observer?: string
+export interface PropertyObjects {
+	type: string;
+	notify?: boolean;
+	readOnly?: boolean;
+	reflectToAttribute?: boolean;
+	computed?: string;
+	observer?: string;
 }
 
-export type Computed = {
-	targets: string[]
+export interface Computed extends DecoratedElement {
+	targets: string[];
 }
 
-export type Observe = {
-	targets: string[]
+export interface Observe extends DecoratedElement {
+	targets: string[];
 }
 
-export type Query = {
-	selector: string
+export interface Query extends DecoratedElement {
+	selector: string;
 }
 
-export type QueryAll = {
-	selector: string
+export interface QueryAll extends DecoratedElement {
+	selector: string;
 }
 
-export type Listen = {
-	eventName: string,
-	target: string | EventTarget
+export interface Listen extends DecoratedElement {
+	eventName: string;
+	target: string | EventTarget;
 }

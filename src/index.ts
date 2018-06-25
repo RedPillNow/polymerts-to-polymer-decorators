@@ -1,43 +1,59 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import * as ts from 'typescript';
-import {TypescriptNodeEmitter} from './utils/transform';
+import {PolymerTsTransformer, PolymerTsTransformerFactory} from './utils/transformer';
 import * as glob from 'glob';
 import * as rimraf from 'rimraf';
 import * as chalk from './utils/chalkConfig';
 
-let _options = null;
-let _procFiles = [];
+let _options: any = null; // TODO: Make this a Type/Interface
+let _procFiles: string[] = [];
+let _generatedFiles: Map<ts.SourceFile, ts.SourceFile> = new Map();
 
+/**
+ * This will update the source files to Polymer 2.0, we need to include Polymer 3.0
+ * @param pathGlob - A glob of file paths
+ * @param options - The options for transformation
+ */
 export default function updateSource(pathGlob: string | string[], options?: any) {
 	console.log(chalk.success('Starting transformation of components...'));
-	let opts = options ? _setOptions(options) : _options;
+	const opts = options ? _setOptions(options) : _options;
 	_options = opts;
+	const compilerOpts = _options.compiler;
 	if (_options.outputPath) {
 		console.log(chalk.success('Output files will be placed in: ' + _options.outputPath));
 		_updateOutputPath();
 	}
 	_procFiles = _getFileArray(pathGlob);
-	const compilerHost = ts.createCompilerHost(_options.compiler);
+	const compilerHost = ts.createCompilerHost(compilerOpts);
 	// generatedFiles is a map with the original source file as the key
 	// and the new sourcefile as the value
-	let generatedFiles: Map<ts.SourceFile, ts.SourceFile> = new Map();
 	for (let i = 0; i < _procFiles.length; i++) {
 		let file = _procFiles[i];
 		console.log(chalk.processing('Parsing File: ' + file + '...'));
-		const program = ts.createProgram(_procFiles, _options.compiler, compilerHost);
-		const sourceFile = program.getSourceFile(file);
-		let emitter = new TypescriptNodeEmitter();
-
-		let newSourceFile = emitter.getSourceMap(sourceFile)
-		generatedFiles.set(sourceFile, newSourceFile[0]);
+		const program: ts.Program = ts.createProgram([file], compilerOpts, compilerHost);
+		const sourceFile: ts.SourceFile = program.getSourceFile(file);
+		const transformerFactory = new PolymerTsTransformerFactory(sourceFile);
+		const transform = transformerFactory.transform;
+		const result: ts.TransformationResult<ts.SourceFile> = ts.transform(sourceFile, [transform.bind(transformerFactory)], compilerOpts);
+		const newSourceFile: ts.SourceFile = result.transformed[0];
+		_generatedFiles.set(sourceFile, newSourceFile);
+		const printer: ts.Printer = ts.createPrinter({newLine: ts.NewLineKind.LineFeed});
+		const outputText: string = printer.printFile(newSourceFile);
+		console.log('done compilng ' + file + 'output=', outputText);
+		_writeSourceFile(file, outputText);
 	}
-	console.log('done compilng', JSON.stringify(generatedFiles.entries));
 }
 
-
+function _writeSourceFile(file: string, outputText: string) {
+	let fileName = path.basename(file);
+	let outputPath = path.join(_options.outputPath, fileName);
+	let writeable = fs.createWriteStream(outputPath);
+	writeable.write(outputText);
+	writeable.end;
+}
 /**
  * Create the output path
- * @param pathGlob
  */
 function _updateOutputPath() {
 	if (!fs.existsSync(_options.outputPath)) {
@@ -66,14 +82,10 @@ function _setOptions(opts): any {
 			]
 		},
 		compiler: {
-			module: ts.ModuleKind.CommonJS,
-			moduleResolution: ts.ModuleResolutionKind.NodeJs,
-			noEmitOnError: false,
-			noUnusedLocals: true,
-			noUnusedParameters: true,
 			stripInternal: true,
 			target: ts.ScriptTarget.ES5,
-			experimentalDecorators: true
+			experimentalDecorators: true,
+			listEmittedFiles: true
 		}
 	};
 	return Object.assign(defaultOpts, opts);
@@ -105,9 +117,9 @@ function _getFileArray(pathGlob) {
 // 	}
 // });
 let files = [
-	// 'src/data/app/elements/dig-person-avatar/*.ts',
+	'src/data/app/elements/dig-person-avatar/*.ts',
 	// 'src/data/app/elements/dig-app-site/*.ts',
-	'src/data/app/elements/dig-app/*.ts',
+	// 'src/data/app/elements/dig-app/*.ts',
 	// 'src/data/app/elements/dig-animated-pages-behavior/*.ts'
 ];
 // getComponents(files, {outputPath: './docs/'});
