@@ -19,8 +19,9 @@ It was also decided that this tool should support more than just a conversion to
 ## Assumptions
 
 We make a few assumptions while transforming PolymerTS files to use polymer-decorators. These are listed below:
-	* Declared Properties are defined before all other types of decorated items (i.e. Observer, Listener, Computed)
-	* If there is a `ready` function, it is defined before all listener decorated items
+
+* Declared Properties are defined before all other types of decorated items (i.e. Observer, Listener, Computed)
+* If there is a `ready` function, it is defined before all listener decorated items
 
 ## Usage
 
