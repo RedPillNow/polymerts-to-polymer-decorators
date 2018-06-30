@@ -3,6 +3,7 @@ import * as chalk from './chalkConfig';
 import {RedPill} from 'polymerts-models';
 import {TransformChangeRecord, TransformChangeType, ConverterOptions, PropertyAddPropertyChangeRecord, PropertyCreateChangeRecord, ListenerAddToReadyChangeRecord, RefNodeCreateChangeRecord, MethodRenameChangeRecord, NotificationType, Notification} from './custom-types';
 import * as transformUtils from './utils';
+import { Transform } from 'stream';
 
 export class PolymerTsTransformerFactory {
 	private _sourceFile: ts.SourceFile;
@@ -106,17 +107,12 @@ export class PolymerTsTransformer {
 					// TODO: We need to transform this one last so we have the required changes to members?
 					let methodDeclNode = ts.isMethodDeclaration(node) ? node as ts.MethodDeclaration : null;
 					if (methodDeclNode && RedPill.isComputedProperty(methodDeclNode, sf)) {
-						let compProp = new RedPill.ComputedProperty(methodDeclNode);
-						compProp.sourceFile = sf;
 						let chgRec = this.transformComputedProp(methodDeclNode);
 						this._transformNodeMap.set(methodDeclNode, chgRec);
 					}else if (methodDeclNode && RedPill.isListener(methodDeclNode, sf)) {
-						let list = new RedPill.Listener(methodDeclNode);
-						list.sourceFile = sf;
-						this._transformNodeMap.set(methodDeclNode, null);
+						let chgRec = this.transformListener(methodDeclNode);
+						this._transformNodeMap.set(methodDeclNode, chgRec);
 					}else if (methodDeclNode && RedPill.isObserver(methodDeclNode, sf)) {
-						let obs = new RedPill.Observer(methodDeclNode);
-						obs.sourceFile = sf;
 						let chgRec: TransformChangeRecord = this.transformObserver(methodDeclNode);
 						this._transformNodeMap.set(methodDeclNode, chgRec);
 					}else {
@@ -383,24 +379,55 @@ export class PolymerTsTransformer {
 
 	transformListener(methodDecl: ts.MethodDeclaration): TransformChangeRecord {
 		let chgRec: TransformChangeRecord = null;
-		if (methodDecl && ts.isMethodDeclaration(methodDecl) && methodDecl.decorators && methodDecl.decorators.length > 0) {
-			let classDecl = this._findExistingClassDeclaration();
-			if (this.options.applyDeclarativeEventListenersMixin) {
-				transformUtils.addRefNodeChangeRecord(classDecl, null, this.options.pathToBowerComponents + 'polymer-decorators/mixins/declarative-event-listeners.d.ts');
-				if (this.options.applyGestureEventListenersMixin) {
-					transformUtils.addRefNodeChangeRecord(classDecl, null, this.options.pathToBowerComponents + 'polymer-decorators/mixins/gesture-event-listeners.d.ts');
+		if (methodDecl && ts.isMethodDeclaration(methodDecl)) {
+			let decorator = transformUtils.getPolymerTsDecorator(methodDecl, this._sourceFile);
+			if (decorator && transformUtils.isListenerDecorator(decorator, this._sourceFile)) {
+				let classDecl: TransformChangeRecord = this._findExistingClassDeclaration();
+				if (this.options.applyDeclarativeEventListenersMixin) {
+					let rpListener = new RedPill.Listener(methodDecl);
+					rpListener.sourceFile = this._sourceFile;
+					let eventName = rpListener.eventName;
+					let eventTarget = rpListener.elementId; // TODO: This _may_ be something other than a string
+					let params: ts.StringLiteral[] = [];
+					params.push(ts.createStringLiteral(eventName));
+					params.push(ts.createStringLiteral(eventTarget));
+					let newDecorator: ts.Decorator = transformUtils.updateDecorator(decorator, 'listen', params);
+					let newMethod = ts.updateMethod(
+						methodDecl,
+						[newDecorator],
+						methodDecl.modifiers,
+						methodDecl.asteriskToken,
+						methodDecl.name,
+						methodDecl.questionToken,
+						methodDecl.typeParameters,
+						methodDecl.parameters,
+						methodDecl.type,
+						methodDecl.body
+					);
+					let notification: Notification = {
+						type: NotificationType.INFO,
+						msg: 'Updated decorator for ' + rpListener.methodName
+					};
+					this._notifications.push(notification);
+					chgRec = {
+						changeType: TransformChangeType.MethodModify,
+						origNode: methodDecl,
+						newNode: newMethod,
+						notification: notification
+					};
+					// TODO: Need to add 2 arguments to the decorator
+				}else {
+					let readyMethod = this._findReadyMethod();
+					let listenerChgRec: ListenerAddToReadyChangeRecord = {
+						changeType: TransformChangeType.ListenerAddToReady,
+						origNode: readyMethod,
+						listenerMethod: methodDecl,
+						createReadyMethod: readyMethod ? false : true,
+						eventName: null,
+						eventTarget: null
+					}
+					chgRec = listenerChgRec;
 				}
-			}else {
-				let readyMethod = this._findReadyMethod();
-				let listenerChgRec: ListenerAddToReadyChangeRecord = {
-					changeType: TransformChangeType.ListenerAddToReady,
-					origNode: readyMethod,
-					listenerMethod: methodDecl,
-					createReadyMethod: readyMethod ? false : true,
-					eventName: null,
-					eventTarget: null
-				}
-				this._changeRecords.push(listenerChgRec);
 			}
 		}
 		return chgRec;
@@ -427,9 +454,9 @@ export class PolymerTsTransformer {
 
 	_findExistingClassDeclaration() {
 		let existingClass = null;
-		this._nodeMap.forEach((val: ts.Node, key: ts.Node, map: Map<ts.Node, ts.Node>) => {
+		this._transformNodeMap.forEach((val: TransformChangeRecord, key: ts.Node, map: Map<ts.Node, TransformChangeRecord>) => {
 			if (ts.isClassDeclaration(key) && RedPill.isComponent(key, this._sourceFile)) {
-				existingClass = key;
+				existingClass = val;
 			}
 		});
 		return existingClass;
@@ -437,11 +464,11 @@ export class PolymerTsTransformer {
 
 	_findReadyMethod() {
 		let readyMeth = null;
-		this._nodeMap.forEach((val: ts.Node, key: ts.Node, map: Map<ts.Node, ts.Node>) => {
+		this._transformNodeMap.forEach((val: TransformChangeRecord, key: ts.Node, map: Map<ts.Node, TransformChangeRecord>) => {
 			if (ts.isMethodDeclaration(key)) {
 				let methodName = key.name.getText(this._sourceFile);
 				if (methodName === 'ready') {
-					readyMeth = key;
+					readyMeth = val;
 				}
 			}
 		});
