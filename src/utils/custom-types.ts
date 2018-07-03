@@ -60,6 +60,7 @@ export enum TransformChangeType {
 	PropertyCreate,
 	/** Add a initializer to a declared property */
 	PropertyAddValueInitializer,
+	PropertyModify,
 	/** Add a reference tag */
 	AddTSReferenceTag,
 	/** Add the DeclarativeEventsBehavior mixin to the class declaration */
@@ -92,7 +93,7 @@ export interface TransformChangeRecord {
 	/** A notification that goes with this change record */
 	notification?: Notification,
 	/** The PolymerTs Model */
-	polymerTsModel?: RedPill.ProgramType,
+	polymerTsModel?: RedPill.ProgramPart,
 	/** The transformed node */
 	newNode?: ts.Node,
 	/** True to create a ready method to add listeners to */

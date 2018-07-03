@@ -3,32 +3,33 @@ import {RedPill} from 'polymerts-models';
 import {TransformChangeType, RefNodeCreateChangeRecord, PropertyOptions} from './custom-types';
 
 export const polymerTsRegEx = {
-	component: /(component\s*\((?:['"]{1}(.*)['"]{1})\))/g,
+	component: /(component\s*\((?:['"]{1}(.*)['"]{1})\))/,
 	extend: null,
-	property: /(property\s*\(({[a-zA-Z0-9:,\s]*})\)\s*([\w\W]*);)/g,
+	property: /(property\s*\(({[a-zA-Z0-9:,\s]*})\)\s*([\w\W]*);)/,
 	observe: /(observe\(([a-zA-Z0-9:,\s'".]*)?\))/,
-	computed: /(computed\(({[a-zA-Z0-9:,\s]*})?\))/g,
+	computed: /(computed\(({[a-zA-Z0-9:,\s]*})?\))/,
 	listen: /(listen\(([\w.\-'"]*)\))/,
-	behavior: /(behavior\s*\((...*)\))/g,
+	behavior: /(behavior\s*\((...*)\))/,
 	hostAttributes: null
 };
 
-export function getArgsFromNode(paramsFromNode: ts.Decorator|ts.MethodDeclaration) {
+export function getArgsFromNode(paramsFromNode: ts.Decorator|ts.MethodDeclaration, sf: ts.SourceFile) {
 	let newArgs: ts.StringLiteral[] = [];
 	if (ts.isDecorator(paramsFromNode)) {
 		const dec: ts.Decorator = <ts.Decorator> paramsFromNode;
 		const callExp: ts.CallExpression = <ts.CallExpression> dec.expression;
 		if (callExp.arguments && callExp.arguments.length > 0) {
 			let currentArg = callExp.arguments[0];
-			let args = callExp.arguments;
-			if (currentArg && currentArg.getText(this._sourceFile).indexOf(',') > -1) {
-				let argStrs = currentArg.getText(this._sourceFile).split(',');
+			if (currentArg && currentArg.getText(sf).indexOf(',') > -1) {
+				let argStrs = currentArg.getText(sf).split(',');
 				for (let i = 0; i < argStrs.length; i++) {
-					newArgs.push(ts.createStringLiteral(argStrs[i]));
+					let arg = argStrs[i];
+					arg = arg.replace(/[\'\"\s]/g, '');
+					newArgs.push(ts.createStringLiteral(arg));
 				}
 			}else {
 				for (let i = 0; i < callExp.arguments.length; i++) {
-					newArgs.push(ts.createStringLiteral(callExp.arguments[i].getText(this._sourceFile)));
+					newArgs.push(ts.createStringLiteral(callExp.arguments[i].getText(sf)));
 				}
 			}
 		}
@@ -37,7 +38,7 @@ export function getArgsFromNode(paramsFromNode: ts.Decorator|ts.MethodDeclaratio
 		if (methodDecl.parameters && methodDecl.parameters.length > 0) {
 			for (let i = 0; i < methodDecl.parameters.length; i++) {
 				let arg: ts.ParameterDeclaration = <ts.ParameterDeclaration> methodDecl.parameters[i];
-				let argName = arg.name.getText(this._sourceFile);
+				let argName = arg.name.getText(sf);
 				let newArg = ts.createStringLiteral(argName);
 				newArgs.push(newArg);
 			}
@@ -46,15 +47,15 @@ export function getArgsFromNode(paramsFromNode: ts.Decorator|ts.MethodDeclaratio
 	return newArgs;
 }
 
-export function updateDecorator(existingDecorator: ts.Decorator, decoratorName: string, params: ts.StringLiteral[]) {
+export function updateDecorator(existingDecorator: ts.Decorator, decoratorName: string, params: ts.StringLiteral[], sf: ts.SourceFile) {
 	let newDecorator: ts.Decorator = null;
 	if (decoratorName && existingDecorator) {
 		const newIdent = ts.createIdentifier(decoratorName);
-		const newArgs: ts.StringLiteral[] = getArgsFromNode(existingDecorator);
+		const newArgs: ts.StringLiteral[] = getArgsFromNode(existingDecorator, sf);
 		let newCallExp = ts.createCall(
 			/* ts.Expression */ newIdent,
 			/* ts.TypeNode[] */ (<ts.CallExpression> existingDecorator.expression).typeArguments,
-			/* ts.Expression[] */ newArgs
+			/* ts.Expression[] */ params || newArgs
 		);
 		newDecorator = ts.updateDecorator(
 			/* ts.Decorator */ existingDecorator,
@@ -64,12 +65,12 @@ export function updateDecorator(existingDecorator: ts.Decorator, decoratorName: 
 	return newDecorator;
 }
 
-export function renameDecorator(parentNode: ts.Node, polymerTsRegEx: RegExp, newDecoratorText: string) {
+export function renameDecorator(parentNode: ts.Node, polymerTsRegEx: RegExp, newDecoratorText: string, sf: ts.SourceFile) {
 	let decorators = parentNode.decorators;
 	let newDecorator: ts.Decorator = null;
 	for (let i = 0; i < decorators.length; i++) {
 		let dec: ts.Decorator = <ts.Decorator> decorators[i];
-		let decText = dec.expression.getText(this._sourceFile);
+		let decText = dec.expression.getText(sf);
 		let decTextMatch = polymerTsRegEx.exec(decText);
 		if (decTextMatch && decTextMatch.length > 0) {
 			let args = (<ts.CallExpression> dec.expression).arguments;
@@ -101,10 +102,13 @@ export function updateMethodDecorator(methodDecl: ts.MethodDeclaration, newDecor
 	);
 }
 
-export function addPropertyToPropertyDecl(property: ts.PropertyDeclaration, newPropName: string, newPropInitializer: string): ts.PropertyDeclaration {
+export function addPropertyToPropertyDecl(property: ts.PropertyDeclaration, newPropName: string, newPropInitializer: string, sf: ts.SourceFile): ts.PropertyDeclaration {
 	let updatedProp = null;
 	if (property) {
-		let existingPropDec = property.decorators && property.decorators.length > 0 ? property.decorators[0] : null;
+		let existingPropDec = property.decorators[0];
+		/* if (!existingPropDec) {
+			existingPropDec = property.decorators[0];
+		} */
 		let objLit = (<ts.ObjectLiteralExpression> (<ts.CallExpression> existingPropDec.expression).arguments[0])
 		let propProps = [];
 		for (let i = 0; i < objLit.properties.length; i++) {
@@ -113,7 +117,7 @@ export function addPropertyToPropertyDecl(property: ts.PropertyDeclaration, newP
 		}
 		let newPropProp = ts.createPropertyAssignment(
 			/* string|ts.Identifier */ newPropName,
-			/* ts.Expression initializer */ ts.createIdentifier(newPropInitializer)
+			/* ts.Expression initializer */ ts.createStringLiteral(newPropInitializer)
 		);
 		propProps.push(newPropProp);
 
@@ -131,11 +135,12 @@ export function addPropertyToPropertyDecl(property: ts.PropertyDeclaration, newP
 		);
 
 		let newDecorator = ts.createDecorator(newCallExp);
-		updatedProp = ts.createProperty(
+		updatedProp = ts.updateProperty(
+			/* ts.PropertyDeclaration */ property,
 			/* ts.Decorator[] */ [newDecorator],
-			/* ts.Modifier[] */ undefined,
+			/* ts.Modifier[] */ property.modifiers,
 			/* string|ts.Identifier */ property.name,
-			/* ts.Token<QuestionToken|ExclamationToken> */ undefined,
+			/* ts.Token<QuestionToken|ExclamationToken> */ property.questionToken,
 			/* ts.TypeNode */ property.type,
 			/* ts.Expression initializer */ property.initializer
 		);
@@ -143,17 +148,93 @@ export function addPropertyToPropertyDecl(property: ts.PropertyDeclaration, newP
 	return updatedProp;
 }
 
-export function getComponentBehaviors(classDecl: ts.ClassDeclaration) {
+export function removePropertyFromPropertyDecl(propDecl: ts.PropertyDeclaration, propertyName: string, sf: ts.SourceFile): ts.PropertyDeclaration {
+	let newProp = propDecl;
+	if (propDecl) {
+		let existingPropDec = getPolymerTsDecorator(propDecl, sf);
+		if (!existingPropDec) {
+			existingPropDec = propDecl.decorators[0];
+		}
+		let objLit = (<ts.ObjectLiteralExpression> (<ts.CallExpression> existingPropDec.expression).arguments[0])
+		let propProps = [];
+		for (let i = 0; i < objLit.properties.length; i++) {
+			let propProp: ts.ObjectLiteralElementLike = objLit.properties[i];
+			if (propProp.name.getText(sf) !== propertyName) {
+				propProps.push(propProp);
+			}
+		}
+		let newObjLit = ts.updateObjectLiteral(
+			/* ts.ObjectLiteralExpression */ objLit,
+			/* ts.ObjectLiteralElementLike */ propProps
+		);
+		let newIdent = ts.createIdentifier('property');
+		let newArgs = [newObjLit];
+		let newCallExp = ts.createCall(
+			newIdent,
+			undefined,
+			newArgs
+		);
+		let newDecorator = ts.createDecorator(newCallExp);
+		newProp = ts.updateProperty(
+			/* ts.PropertyDeclaration */ propDecl,
+			/* ts.Decorator[] */ [newDecorator],
+			/* ts.Modifier[] */ propDecl.modifiers,
+			/* string|ts.Identifier */ propDecl.name,
+			/* ts.Token<QuestionToken|ExclamationToken> */ propDecl.questionToken,
+			/* ts.TypeNode */ propDecl.type,
+			/* ts.Expression initializer */ propDecl.initializer
+		);
+	}
+	return newProp;
+}
+
+export function addInitializerToPropertyDecl(propDecl: ts.PropertyDeclaration, initializer: ts.Expression): ts.PropertyDeclaration {
+	let newProp = propDecl;
+	if (propDecl) {
+		newProp = ts.updateProperty(
+			/* ts.PropertyDeclaration */ propDecl,
+			/* ts.Decorator[] */ propDecl.decorators,
+			/* ts.Modifier[] */ propDecl.modifiers,
+			/* ts.Identifier */ propDecl.name,
+			/* ts.QuestionToken */ propDecl.questionToken,
+			/* ts.typeNode */ propDecl.type,
+			/* ts.Expression init */ initializer
+		)
+	}
+	return newProp;
+}
+
+export function getPropertyValueExpression(propDecl: ts.PropertyDeclaration, sf: ts.SourceFile): ts.Expression {
+	let valueExp: ts.Expression = null;
+	if (propDecl) {
+		let existingPropDec = getPolymerTsDecorator(propDecl, sf);
+		if (!existingPropDec) {
+			existingPropDec = propDecl.decorators[0];
+		}
+		let objLit = (<ts.ObjectLiteralExpression> (<ts.CallExpression> existingPropDec.expression).arguments[0])
+		for (let i = 0; i < objLit.properties.length; i++) {
+			let propProp: ts.ObjectLiteralElementLike = objLit.properties[i];
+			if (propProp.name.getText(sf) === 'value' && ts.isPropertyAssignment(propProp)) {
+				let propPropAssign: ts.PropertyAssignment = <ts.PropertyAssignment> propProp;
+				valueExp = propPropAssign.initializer;
+				break;
+			}
+		}
+	}
+	return valueExp;
+}
+
+export function getComponentBehaviors(classDecl: ts.ClassDeclaration, sf: ts.SourceFile) {
 	let decorators = classDecl.decorators;
 	let behaviors: RedPill.IncludedBehavior[] = [];
 	if (decorators && decorators.length > 0) {
 		for (let i = 0; i < decorators.length; i++) {
 			let decorator = decorators[i];
-			let decText = decorator.expression.getText(this._sourceFile);
-			let decTextMatchBehavior = this.polymerTsDecoratorRegEx.behavior.exec(decText);
+			let decText = decorator.expression.getText(sf);
+			let decTextMatchBehavior = polymerTsRegEx.behavior.exec(decText);
 			if (decTextMatchBehavior && decTextMatchBehavior.length > 0) {
 				let rpBehavior = new RedPill.IncludedBehavior();
-				rpBehavior.sourceFile = this._sourceFile;
+				rpBehavior.sourceFile = sf;
 				rpBehavior.decorator = decorator;
 				behaviors.push(rpBehavior);
 			}
