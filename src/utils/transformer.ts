@@ -235,159 +235,49 @@ export class PolymerTsTransformer {
 		let chgRec: TransformChangeRecord = null;
 		if (methodDecl && ts.isMethodDeclaration(methodDecl)) {
 			let methodName = methodDecl.name.getText(this._sourceFile);
+			let notify: Notification =  {
+				type: NotificationType.INFO,
+				msg: 'Replaced the ' + methodName + ' with a getter.'
+			};
 			let decorator: ts.Decorator = transformUtils.getPolymerTsDecorator(methodDecl, this._sourceFile);
+			let newDecorators: ts.Decorator[] = [];
 			if (decorator) {
 				let rpCompProp = new RedPill.ComputedProperty(methodDecl);
 				rpCompProp.sourceFile = this._sourceFile;
 				if (transformUtils.decoratorHasObjectArgument(decorator)) { // @computed({type: String})
-					/* if (methodDecl.parameters && methodDecl.parameters.length === 1) { // someProp(someArg)
-						let newPropObj = transformUtils.getDecoratorObjectArgument(decorator);
-						let newComputedMethodName = methodName.charAt(0).toUpperCase() + methodName.substr(1);
-						let newProp = transformUtils.createProperty(newPropObj, methodName, this._sourceFile);
-						newProp = transformUtils.addPropertyToPropertyDecl(newProp, 'computed', newComputedMethodName, this._sourceFile);
-						let notify: Notification = {
-							type: NotificationType.INFO,
-							msg: 'Moved computed property ' + methodName + ' to it\'s own property'
-						};
-						let addPropChgRec: PropertyCreateChangeRecord = {
-							changeType: TransformChangeType.PropertyCreate,
-							computedMethod: newComputedMethodName,
-							origNode: null,
-							propertyName: methodName,
-							propertyPropertiesObject: newPropObj,
-							newNode: newProp,
-							notification: notify
-						}
-						this._addNodes.push(addPropChgRec);
-						this._notifications.push(notify);
-						let updatedMethod: ts.MethodDeclaration = ts.updateMethod(
-							methodDecl,
-							methodDecl.decorators,
-							methodDecl.modifiers,
-							methodDecl.asteriskToken,
-							ts.createIdentifier(newComputedMethodName),
-							methodDecl.questionToken,
-							methodDecl.typeParameters,
-							methodDecl.parameters,
-							methodDecl.type,
-							methodDecl.body
-						)
-						notify = {
-							type: NotificationType.INFO,
-							msg: 'Renamed method ' + methodName + ' to ' + newComputedMethodName
-						}
-						let renameMethChgRec: MethodRenameChangeRecord = {
-							origNode: methodDecl,
-							changeType: TransformChangeType.MethodRename,
-							newName: newComputedMethodName,
-							newNode: updatedMethod,
-							notification: notify
-						}
-						chgRec = renameMethChgRec;
-						this._notifications.push(notify);
-					}else {
-						// TODO: If a decorator has an object parameter and there are more than 1 parameters for the method, then create the property, but the entire @computed + method need to be the name of the property
-					} */
-				}else {
-					let newArgs: ts.StringLiteral[] = transformUtils.getArgsFromNode(methodDecl, this._sourceFile);
-					let newDecorator = transformUtils.updateDecorator(decorator, 'computed', newArgs, this._sourceFile);
-					let propertyName: ts.Identifier = <ts.Identifier> methodDecl.name;
-					// TODO: Need to parse the body looking for property names and change them to use `this.propertyName`
-					let newGetter: ts.GetAccessorDeclaration = ts.createGetAccessor(
-						/* ts.Decorator[] */ [newDecorator],
-						/* ts.Modifier[] */ undefined,
-						/* ts.Identifier|ts.StringLiteral */ propertyName,
-						/* ts.ParameterDeclaration[] */ undefined,
+					let callExp: ts.CallExpression = <ts.CallExpression> decorator.expression;
+					let objLitExp: ts.ObjectLiteralExpression = <ts.ObjectLiteralExpression> callExp.arguments[0];
+					let newCallExp: ts.CallExpression = ts.createCall(
+						/* ts.Expression */ ts.createIdentifier('property'),
 						/* ts.TypeNode */ undefined,
-						/* ts.Block */ methodDecl.body
+						/* args ts.Expression[] */ [objLitExp]
 					);
-					let notify: Notification = {
-						type: NotificationType.INFO,
-						msg: 'Replaced the ' + methodName + ' with a getter'
-					};
-					let replaceMeth: TransformChangeRecord = {
-						changeType: TransformChangeType.MethodReplace,
-						origNode: methodDecl,
-						newNode: newGetter,
-						notification: notify
-					}
-					chgRec = replaceMeth;
-					this._notifications.push(notify);
+					let newPropertyDecorator: ts.Decorator = ts.createDecorator(
+						/* ts.Expression */ newCallExp
+					);
+					newDecorators.push(newPropertyDecorator);
+					notify.msg += ' Added a property decorator';
 				}
-			}
-		}
-		return chgRec;
-	}
-
-	transformObserver(methodDecl: ts.MethodDeclaration): TransformChangeRecord {
-		let chgRec: TransformChangeRecord = null;
-		if (methodDecl && ts.isMethodDeclaration(methodDecl)) {
-			let decorator:ts.Decorator = transformUtils.getPolymerTsDecorator(methodDecl, this._sourceFile);
-			let methodName = methodDecl.name.getText(this._sourceFile);
-			if (decorator && transformUtils.isObserverDecorator(decorator, this._sourceFile)) {
-				let callExp: ts.CallExpression = <ts.CallExpression> decorator.expression;
-				let rpObserver = new RedPill.Observer(methodDecl);
-				rpObserver.sourceFile = this._sourceFile;
-				let notify: Notification = null;
-				let newDecorators = [];
-				let moveSingles = this.options.moveSinglePropertyObserversToProperty;
-				if (rpObserver.params && rpObserver.params.length === 1 && moveSingles) {
-					let argName = callExp.arguments[0].getText(this._sourceFile);
-					argName = argName ? argName.replace(/[\'"]*/g, '') : argName;
-					const existPropChgRec: TransformChangeRecord = this._findExistingDeclaredProperty(argName);
-					if (existPropChgRec && existPropChgRec.newNode) {
-						let existingProp = existPropChgRec.newNode ? <ts.PropertyDeclaration> existPropChgRec.newNode : null;
-						if (existingProp) {
-							existingProp = transformUtils.addPropertyToPropertyDecl(existingProp, 'observer', methodName, this._sourceFile);
-							existPropChgRec.newNode = existingProp;
-							this._transformNodeMap.set(existPropChgRec.origNode, existPropChgRec);
-							notify = {
-								type: NotificationType.INFO,
-								msg: 'Moved the observer for ' + argName + ' to it\'s relevant property'
-							}
-						}else {
-							notify = {
-								type: NotificationType.ERROR,
-								msg: 'Found a change record for ' + argName + ' but no new node was defined'
-							};
-						}
-					}else {
-						notify = {
-							type: NotificationType.ERROR,
-							msg: 'Found a change record for property ' + argName + ', no new node was defined transforming observer ' + rpObserver.methodName + '!'
-						};
-					}
-				}else if (rpObserver.params && rpObserver.params.length > 1) {
-					let params: ts.StringLiteral[] = [];
-					for (let i = 0; i < rpObserver.params.length; i++) {
-						let param: ts.StringLiteral = ts.createStringLiteral(rpObserver.params[i])
-						params.push(param);
-					}
-					let newDecorator: ts.Decorator = transformUtils.updateDecorator(decorator, 'observe', params, this._sourceFile);
-					newDecorators.push(newDecorator);
-					notify = {
-						type: NotificationType.INFO,
-						msg: 'Updated the observe decorator for the ' + rpObserver.methodName + ' method'
-					}
-				}
-				let newMethod = ts.updateMethod(
-					methodDecl,
-					newDecorators,
-					methodDecl.modifiers,
-					methodDecl.asteriskToken,
-					methodDecl.name,
-					methodDecl.questionToken,
-					methodDecl.typeParameters,
-					methodDecl.parameters,
-					methodDecl.type,
-					methodDecl.body
-				)
-				chgRec = {
-					changeType: TransformChangeType.MethodModify,
+				let newArgs: ts.StringLiteral[] = transformUtils.getArgsFromNode(methodDecl, this._sourceFile);
+				let updatedDecorator = transformUtils.updateDecorator(decorator, 'computed', newArgs, this._sourceFile);
+				newDecorators.push(updatedDecorator);
+				let propertyName: ts.Identifier = <ts.Identifier> methodDecl.name;
+				// TODO: Need to parse the body looking for property names and change them to use `this.propertyName`
+				let newGetter: ts.GetAccessorDeclaration = ts.createGetAccessor(
+					/* ts.Decorator[] */ newDecorators,
+					/* ts.Modifier[] */ undefined,
+					/* ts.Identifier|ts.StringLiteral */ propertyName,
+					/* ts.ParameterDeclaration[] */ undefined,
+					/* ts.TypeNode */ undefined,
+					/* ts.Block */ methodDecl.body
+				);
+				let replaceMeth: TransformChangeRecord = {
+					changeType: TransformChangeType.MethodReplace,
 					origNode: methodDecl,
-					newNode: newMethod,
+					newNode: newGetter,
 					notification: notify
-				};
+				}
+				chgRec = replaceMeth;
 				this._notifications.push(notify);
 			}
 		}
@@ -444,6 +334,82 @@ export class PolymerTsTransformer {
 					}
 					chgRec = listenerChgRec;
 				}
+			}
+		}
+		return chgRec;
+	}
+
+	transformObserver(methodDecl: ts.MethodDeclaration): TransformChangeRecord {
+		let chgRec: TransformChangeRecord = null;
+		if (methodDecl && ts.isMethodDeclaration(methodDecl)) {
+			let decorator:ts.Decorator = transformUtils.getPolymerTsDecorator(methodDecl, this._sourceFile);
+			let methodName = methodDecl.name.getText(this._sourceFile);
+			if (decorator && transformUtils.isObserverDecorator(decorator, this._sourceFile)) {
+				let callExp: ts.CallExpression = <ts.CallExpression> decorator.expression;
+				let rpObserver = new RedPill.Observer(methodDecl);
+				rpObserver.sourceFile = this._sourceFile;
+				let notify: Notification = null;
+				let newDecorators = [];
+				let moveSingles = this.options.moveSinglePropertyObserversToProperty;
+				let isComplex = transformUtils.isComplexObserver(decorator, this._sourceFile);
+				if (rpObserver.params && rpObserver.params.length === 1 && moveSingles && !isComplex) {
+					let argName = callExp.arguments[0].getText(this._sourceFile);
+					argName = argName ? argName.replace(/[\'"]*/g, '') : argName;
+					const existPropChgRec: TransformChangeRecord = this._findExistingDeclaredProperty(argName);
+					if (existPropChgRec && existPropChgRec.newNode) {
+						let existingProp = existPropChgRec.newNode ? <ts.PropertyDeclaration> existPropChgRec.newNode : null;
+						if (existingProp) {
+							existingProp = transformUtils.addPropertyToPropertyDecl(existingProp, 'observer', methodName, this._sourceFile);
+							existPropChgRec.newNode = existingProp;
+							this._transformNodeMap.set(existPropChgRec.origNode, existPropChgRec);
+							notify = {
+								type: NotificationType.INFO,
+								msg: 'Moved the observer for ' + argName + ' to it\'s relevant property'
+							}
+						}else {
+							notify = {
+								type: NotificationType.ERROR,
+								msg: 'Found a change record for ' + argName + ' but no new node was defined'
+							};
+						}
+					}else {
+						notify = {
+							type: NotificationType.ERROR,
+							msg: 'Found a change record for property ' + argName + ', no new node was defined transforming observer ' + rpObserver.methodName + '!'
+						};
+					}
+				}else if (rpObserver.params && (rpObserver.params.length > 1 || isComplex)) {
+					let params: ts.StringLiteral[] = [];
+					for (let i = 0; i < rpObserver.params.length; i++) {
+						let param: ts.StringLiteral = ts.createStringLiteral(rpObserver.params[i])
+						params.push(param);
+					}
+					let newDecorator: ts.Decorator = transformUtils.updateDecorator(decorator, 'observe', params, this._sourceFile);
+					newDecorators.push(newDecorator);
+					notify = {
+						type: NotificationType.INFO,
+						msg: 'Updated the observe decorator for the ' + rpObserver.methodName + ' method'
+					}
+				}
+				let newMethod = ts.updateMethod(
+					methodDecl,
+					newDecorators,
+					methodDecl.modifiers,
+					methodDecl.asteriskToken,
+					methodDecl.name,
+					methodDecl.questionToken,
+					methodDecl.typeParameters,
+					methodDecl.parameters,
+					methodDecl.type,
+					methodDecl.body
+				)
+				chgRec = {
+					changeType: TransformChangeType.MethodModify,
+					origNode: methodDecl,
+					newNode: newMethod,
+					notification: notify
+				};
+				this._notifications.push(notify);
 			}
 		}
 		return chgRec;

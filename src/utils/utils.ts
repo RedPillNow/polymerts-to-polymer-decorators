@@ -449,3 +449,22 @@ export function objectLiteralExpressionToObjectLiteral(objLitExp: ts.ObjectLiter
 	}
 	return opts;
 }
+
+export function isComplexObserver(decorator: ts.Decorator, sf: ts.SourceFile): boolean {
+	let isComplex = false;
+	if (decorator) {
+		let callExp: ts.CallExpression = <ts.CallExpression> decorator.expression;
+		let args: ts.Expression[] = [].concat(callExp.arguments);
+		for (let i = 0; i < args.length; i++) {
+			let arg: ts.Expression = args[i];
+			if (arg && ts.isStringLiteral) {
+				let argStr: ts.StringLiteral = <ts.StringLiteral> arg;
+				if (argStr.getText(sf).indexOf('.') > -1) {
+					isComplex = true;
+					break;
+				}
+			}
+		}
+	}
+	return isComplex;
+}
