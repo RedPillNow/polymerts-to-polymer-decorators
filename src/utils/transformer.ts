@@ -30,18 +30,29 @@ export class PolymerTsTransformerFactory {
 	set targetPolymerVersion(targetPolymerVersion: number) {
 		this._targetPolymerVersion = targetPolymerVersion ? targetPolymerVersion : 2;
 	}
-
+	/**
+	 * Return the PolymerTsTransformer instance
+	 * @type {PolymerTsTransformer}
+	 */
 	get transformer() {
 		return this._transformer;
 	}
-
+	/**
+	 * Do a pre-transform
+	 * @param ctx {ts.TransformationContext}
+	 * @return {ts.Transformer<ts.SourceFile>}
+	 */
 	preTransform(ctx: ts.TransformationContext): ts.Transformer<ts.SourceFile> {
 		console.log(chalk.processing('Analyzing source file for required changes...'));
 		let preSource = ts.createSourceFile(this._sourceFile.fileName, this._sourceFile.getText(), this._sourceFile.languageVersion);
 		let preTransform: ts.Transformer<ts.SourceFile> = this._transformer.preTransform.apply(this._transformer, [ctx, preSource]);
 		return preTransform;
 	}
-
+	/**
+	 * Transform the nodes defined in transformer.transformNodeMap
+	 * @param ctx {ts.TransformationContext}
+	 * @return {ts.Transformer<ts.SourceFile>}
+	 */
 	transform(ctx: ts.TransformationContext): ts.Transformer<ts.SourceFile> {
 		let preTransform: ts.TransformationResult<ts.SourceFile> = ts.transform(this._sourceFile, [this.preTransform.bind(this)]);
 		let transformer: ts.Transformer<ts.SourceFile> = this._transformer.transform.apply(this._transformer, [ctx, this._sourceFile]);
