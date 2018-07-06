@@ -4,12 +4,21 @@ import {RedPill} from 'polymerts-models';
 import {TransformChangeRecord, TransformChangeType, ConverterOptions, ListenerAddToReadyChangeRecord, NotificationType, Notification} from './custom-types';
 import * as transformUtils from './utils';
 
+/**
+ * @class
+ * @classdesc The transformer factory. This is where the visitor pattern starts
+ */
 export class PolymerTsTransformerFactory {
 	private _sourceFile: ts.SourceFile;
 	private _targetPolymerVersion: number;
 	private _options: ConverterOptions;
 	private _transformer: PolymerTsTransformer;
 
+	/**
+	 * @param sourceFile {ts.SourceFile}
+	 * @param options {ConverterOptions}
+	 * @param targetPolymerVersion {number} not currently used
+	 */
 	constructor(sourceFile: ts.SourceFile, options: ConverterOptions, targetPolymerVersion?: number) {
 		this._sourceFile = sourceFile;
 		this._targetPolymerVersion = targetPolymerVersion;
@@ -55,11 +64,16 @@ export class PolymerTsTransformerFactory {
 	 */
 	transform(ctx: ts.TransformationContext): ts.Transformer<ts.SourceFile> {
 		let preTransform: ts.TransformationResult<ts.SourceFile> = ts.transform(this._sourceFile, [this.preTransform.bind(this)]);
+		console.log(chalk.processing('Transforming source file. Found ' + this.transformer.transformNodeMap.size + ' changes to be made...'));
 		let transformer: ts.Transformer<ts.SourceFile> = this._transformer.transform.apply(this._transformer, [ctx, this._sourceFile]);
 		return transformer;
 	}
 }
-
+/**
+ * @class
+ * @classdesc Uses the visitor pattern to transform PolymerTS decorators and some code
+ * to be compliant with polymer-decorators
+ */
 export class PolymerTsTransformer {
 	private _ctx: ts.TransformationContext;
 	private _sourceFile: ts.SourceFile;
@@ -68,6 +82,9 @@ export class PolymerTsTransformer {
 	private _addNodes: TransformChangeRecord[] = [];
 	private _notifications: Notification[] = [];
 
+	/**
+	 * @param options {ConverterOptions}
+	 */
 	constructor(options: ConverterOptions) {
 		this._options = options;
 	}
@@ -196,12 +213,13 @@ export class PolymerTsTransformer {
 		this._ctx = ctx;
 		const visitor = (node: ts.Node): ts.VisitResult<ts.Node> => {
 			node = ts.visitEachChild(node, visitor, ctx);
-			if (ts.isClassDeclaration(node)) {
-				console.log(chalk.processing('*******Looking for a ' + ts.SyntaxKind[node.kind] + '*******'));
-			}else {
-				console.log(chalk.processing('Looking for a ' + ts.SyntaxKind[node.kind]));
-			}
 			let transformChgRec = this._transformNodeMap.get(node);
+			if (ts.isClassDeclaration(node) && !transformChgRec) {
+				console.log(chalk.processing('*******Looking for a ' + ts.SyntaxKind[node.kind] + '*******'));
+				let classDecl = <ts.ClassDeclaration> node;
+				let className = transformUtils.getClassNameFromClassDeclaration(classDecl, this._sourceFile);
+				transformChgRec = this._findExistingClassDeclaration(className);
+			}
 			if (transformChgRec) {
 				console.log(chalk.processing('Found a change record for ' + ts.SyntaxKind[node.kind]));
 				let newNode = transformChgRec.newNode;
@@ -382,7 +400,6 @@ export class PolymerTsTransformer {
 		if (methodDecl && ts.isMethodDeclaration(methodDecl)) {
 			let decorator = transformUtils.getPolymerTsDecorator(methodDecl, this._sourceFile);
 			if (decorator && transformUtils.isListenerDecorator(decorator, this._sourceFile)) {
-				let classDecl: TransformChangeRecord = this._findExistingClassDeclaration();
 				if (this.options.applyDeclarativeEventListenersMixin) {
 					let rpListener = new RedPill.Listener(methodDecl);
 					rpListener.sourceFile = this._sourceFile;
@@ -425,7 +442,7 @@ export class PolymerTsTransformer {
 					if (readyMethod) {
 						let listenerChgRec: ListenerAddToReadyChangeRecord = {
 							changeType: TransformChangeType.ListenerAddToReady,
-							origNode: readyMethod,
+							origNode: readyMethod.origNode,
 							listenerMethod: methodDecl,
 							createReadyMethod: readyMethod ? false : true,
 							eventName: null,
@@ -566,11 +583,16 @@ export class PolymerTsTransformer {
 	 * Find an already processed Class Declaration
 	 * @return {TransformChangeREcord}
 	 */
-	private _findExistingClassDeclaration(): TransformChangeRecord {
+	private _findExistingClassDeclaration(className: string): TransformChangeRecord {
 		let existingClass = null;
 		this._transformNodeMap.forEach((val: TransformChangeRecord, key: ts.Node, map: Map<ts.Node, TransformChangeRecord>) => {
 			if (ts.isClassDeclaration(key) && RedPill.isComponent(key, this._sourceFile)) {
-				existingClass = val;
+				let keyClassName = transformUtils.getClassNameFromClassDeclaration(key, this._sourceFile);
+				let valClassDecl = <ts.ClassDeclaration> val.origNode;
+				let valClassName = transformUtils.getClassNameFromClassDeclaration(valClassDecl, this._sourceFile);
+				if (keyClassName === valClassName) {
+					existingClass = val;
+				}
 			}
 		});
 		return existingClass;

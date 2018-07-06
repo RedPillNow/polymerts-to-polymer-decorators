@@ -253,6 +253,19 @@ export function addInitializerToPropertyDecl(propDecl: ts.PropertyDeclaration, i
 	return newProp;
 }
 /**
+ * Get the class name from a ClassDeclaration
+ * @param classDecl {ts.ClassDeclaration}
+ * @param sf {ts.SourceFile}
+ * @return {string}
+ */
+export function getClassNameFromClassDeclaration(classDecl: ts.ClassDeclaration, sf: ts.SourceFile): string {
+	let className = null;
+	if (classDecl) {
+		className = classDecl.name.getText(sf);
+	}
+	return className;
+}
+/**
  * Get the value property from a property decorator argument. The return value will generally
  * be used in addInitializerToPropertyDecl
  * @param propDecl {ts.PropertyDeclaration}
