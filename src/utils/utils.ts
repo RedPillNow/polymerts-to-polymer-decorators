@@ -4,13 +4,11 @@ import {TransformChangeType, RefNodeCreateChangeRecord, PropertyOptions} from '.
 
 export const polymerTsRegEx = {
 	component: /(component\s*\((?:['"]{1}(.*)['"]{1})\))/,
-	extend: null,
 	property: /(property\s*\(({[a-zA-Z0-9:,\s]*})\)\s*([\w\W]*);)/,
 	observe: /(observe\(([a-zA-Z0-9:,\s'".]*)?\))/,
 	computed: /(computed\(({[a-zA-Z0-9:,\s]*})?\))/,
 	listen: /(listen\(([\w.\-'"]*)\))/,
-	behavior: /(behavior\s*\((...*)\))/,
-	hostAttributes: null
+	behavior: /(behavior\s*\((...*)\))/
 };
 
 export function getArgsFromNode(paramsFromNode: ts.Decorator|ts.MethodDeclaration, sf: ts.SourceFile) {
@@ -47,7 +45,7 @@ export function getArgsFromNode(paramsFromNode: ts.Decorator|ts.MethodDeclaratio
 	return newArgs;
 }
 
-export function updateDecorator(existingDecorator: ts.Decorator, decoratorName: string, params: ts.StringLiteral[], sf: ts.SourceFile) {
+export function updateDecorator(existingDecorator: ts.Decorator, decoratorName: string, params: ts.Expression[], sf: ts.SourceFile) {
 	let newDecorator: ts.Decorator = null;
 	if (decoratorName && existingDecorator) {
 		const newIdent = ts.createIdentifier(decoratorName);
@@ -102,10 +100,10 @@ export function updateMethodDecorator(methodDecl: ts.MethodDeclaration, newDecor
 	);
 }
 
-export function addPropertyToPropertyDecl(property: ts.PropertyDeclaration, newPropName: string, newPropInitializer: string, sf: ts.SourceFile): ts.PropertyDeclaration {
+export function addPropertyToPropertyDecl(propDecl: ts.PropertyDeclaration, newPropName: string, newPropInitializer: string, sf: ts.SourceFile): ts.PropertyDeclaration {
 	let updatedProp = null;
-	if (property) {
-		let existingPropDec = property.decorators[0];
+	if (propDecl) {
+		let existingPropDec = propDecl.decorators[0];
 		/* if (!existingPropDec) {
 			existingPropDec = property.decorators[0];
 		} */
@@ -136,13 +134,13 @@ export function addPropertyToPropertyDecl(property: ts.PropertyDeclaration, newP
 
 		let newDecorator = ts.createDecorator(newCallExp);
 		updatedProp = ts.updateProperty(
-			/* ts.PropertyDeclaration */ property,
+			/* ts.PropertyDeclaration */ propDecl,
 			/* ts.Decorator[] */ [newDecorator],
-			/* ts.Modifier[] */ property.modifiers,
-			/* string|ts.Identifier */ property.name,
-			/* ts.Token<QuestionToken|ExclamationToken> */ property.questionToken,
-			/* ts.TypeNode */ property.type,
-			/* ts.Expression initializer */ property.initializer
+			/* ts.Modifier[] */ propDecl.modifiers,
+			/* string|ts.Identifier */ propDecl.name,
+			/* ts.Token<QuestionToken|ExclamationToken> */ propDecl.questionToken,
+			/* ts.TypeNode */ propDecl.type,
+			/* ts.Expression initializer */ propDecl.initializer
 		);
 	}
 	return updatedProp;

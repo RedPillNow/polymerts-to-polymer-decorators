@@ -69,6 +69,8 @@ export enum TransformChangeType {
 	ClassAddGestureEventsBehavior,
 	/** Add a behavior that is not the DeclarativeEvents or GestureEvents behaviors */
 	ClassAddBehavior,
+	/** Modify the class statement */
+	ClassModify,
 	/** Create a standard event listener in the "ready" function */
 	ListenerAddToReady,
 	/** Replace a method with a new method */

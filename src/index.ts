@@ -35,12 +35,14 @@ export default function updateSource(pathGlob: string | string[], options?: any)
 		const program: ts.Program = ts.createProgram([file], compilerOpts, compilerHost);
 		const sourceFile: ts.SourceFile = program.getSourceFile(file);
 		const transformerFactory = new PolymerTsTransformerFactory(sourceFile, _options, 2);
-		const transform = transformerFactory.transform;
-		const result: ts.TransformationResult<ts.SourceFile> = ts.transform(sourceFile, [transform.bind(transformerFactory)], compilerOpts);
+		const transformMethod = transformerFactory.transform;
+		const result: ts.TransformationResult<ts.SourceFile> = ts.transform(sourceFile, [transformMethod.bind(transformerFactory)], compilerOpts);
 		const newSourceFile: ts.SourceFile = result.transformed[0];
 		_generatedFiles.set(sourceFile, newSourceFile);
 		const printer: ts.Printer = ts.createPrinter({newLine: ts.NewLineKind.LineFeed});
 		const outputText: string = printer.printFile(newSourceFile);
+		const notifications = transformerFactory.transformer.notifications;
+		const transformChgMaps = transformerFactory.transformer.transformNodeMap;
 		console.log('done compilng' + file);
 		_writeSourceFile(file, outputText);
 	}
@@ -85,7 +87,7 @@ function _setOptions(opts): ConverterOptions {
 		applyDeclarativeEventListenersMixin: true,
 		applyGestureEventListenersMixin: false,
 		pathToBowerComponents: '../../bower_components/',
-		changeComponentClassExtension: false,
+		changeComponentClassExtension: true,
 		glob: {
 			ignore: [
 				'bower_components/**/*.*',
@@ -128,9 +130,9 @@ function _getFileArray(pathGlob) {
 // 	}
 // });
 let files = [
-	// 'src/data/app/elements/dig-person-avatar/*.ts',
+	'src/data/app/elements/dig-person-avatar/*.ts',
 	// 'src/data/app/elements/dig-app-site/*.ts',
-	'src/data/app/elements/dig-app/*.ts',
+	// 'src/data/app/elements/dig-app/*.ts',
 	// 'src/data/app/elements/dig-animated-pages-behavior/*.ts'
 ];
 // getComponents(files, {outputPath: './docs/'});

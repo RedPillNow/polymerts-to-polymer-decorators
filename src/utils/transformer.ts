@@ -32,15 +32,19 @@ export class PolymerTsTransformerFactory {
 		this._targetPolymerVersion = targetPolymerVersion ? targetPolymerVersion : 2;
 	}
 
+	get transformer() {
+		return this._transformer;
+	}
+
 	preTransform(ctx: ts.TransformationContext): ts.Transformer<ts.SourceFile> {
 		console.log(chalk.processing('Analyzing source file for required changes...'));
 		let preSource = ts.createSourceFile(this._sourceFile.fileName, this._sourceFile.getText(), this._sourceFile.languageVersion);
-		let preTransform: ts.Transformer<ts.SourceFile> = this._transformer.getTransformNodes.apply(this._transformer, [ctx, preSource]);
+		let preTransform: ts.Transformer<ts.SourceFile> = this._transformer.preTransform.apply(this._transformer, [ctx, preSource]);
 		return preTransform;
 	}
 
 	transform(ctx: ts.TransformationContext): ts.Transformer<ts.SourceFile> {
-		ts.transform(this._sourceFile, [this.preTransform.bind(this)]);
+		let preTransform: ts.TransformationResult<ts.SourceFile> = ts.transform(this._sourceFile, [this.preTransform.bind(this)]);
 		let transformer: ts.Transformer<ts.SourceFile> = this._transformer.transform.apply(this._transformer, [ctx, this._sourceFile]);
 		return transformer;
 	}
@@ -48,9 +52,7 @@ export class PolymerTsTransformerFactory {
 
 export class PolymerTsTransformer {
 	private _ctx: ts.TransformationContext;
-	private _nodeMap: Map<ts.Node, ts.Node|null> = new Map();
 	private _sourceFile: ts.SourceFile;
-	private _changeRecords: TransformChangeRecord[] = [];
 	private _options: ConverterOptions;
 	private _transformNodeMap: Map<ts.Node, TransformChangeRecord> = new Map();
 	private _addNodes: TransformChangeRecord[] = [];
@@ -66,10 +68,6 @@ export class PolymerTsTransformer {
 
 	set ctx(ctx: ts.TransformationContext) {
 		this._ctx = ctx;
-	}
-
-	get nodeMap() {
-		return this._nodeMap;
 	}
 
 	notifyUser(msg) {
@@ -88,7 +86,11 @@ export class PolymerTsTransformer {
 		return this._notifications;
 	}
 
-	getTransformNodes(ctx: ts.TransformationContext, sf: ts.SourceFile): ts.Transformer<ts.SourceFile> {
+	get transformNodeMap() {
+		return this._transformNodeMap;
+	}
+
+	preTransform(ctx: ts.TransformationContext, sf: ts.SourceFile): ts.Transformer<ts.SourceFile> {
 		this._sourceFile = sf;
 		this._ctx = ctx;
 		const preVisitor = (node: ts.Node): ts.VisitResult<ts.Node> => {
@@ -97,25 +99,29 @@ export class PolymerTsTransformer {
 				case ts.SyntaxKind.ClassDeclaration:
 					let classDecl = ts.isClassDeclaration(node) ? node as ts.ClassDeclaration : null;
 					if (classDecl && RedPill.isComponent(classDecl, sf)) {
-						let comp = new RedPill.Component(classDecl);
-						comp.sourceFile = sf;
-						let classChgRec = this.transformClassDecl(classDecl);
-						this._transformNodeMap.set(classDecl, classChgRec);
+						let chgRec = this.transformClassDecl(classDecl);
+						if (chgRec) {
+							this._transformNodeMap.set(node, chgRec);
+						}
 					}
-					break;
-				case ts.SyntaxKind.ModuleDeclaration:
 					break;
 				case ts.SyntaxKind.MethodDeclaration:
 					let methodDeclNode = ts.isMethodDeclaration(node) ? node as ts.MethodDeclaration : null;
 					if (methodDeclNode && RedPill.isComputedProperty(methodDeclNode, sf)) {
 						let chgRec = this.transformComputedProp(methodDeclNode);
-						this._transformNodeMap.set(methodDeclNode, chgRec);
+						if (chgRec) {
+							this._transformNodeMap.set(methodDeclNode, chgRec);
+						}
 					}else if (methodDeclNode && RedPill.isListener(methodDeclNode, sf)) {
 						let chgRec = this.transformListener(methodDeclNode);
-						this._transformNodeMap.set(methodDeclNode, chgRec);
+						if (chgRec) {
+							this._transformNodeMap.set(methodDeclNode, chgRec);
+						}
 					}else if (methodDeclNode && RedPill.isObserver(methodDeclNode, sf)) {
 						let chgRec: TransformChangeRecord = this.transformObserver(methodDeclNode);
-						this._transformNodeMap.set(methodDeclNode, chgRec);
+						if (chgRec) {
+							this._transformNodeMap.set(methodDeclNode, chgRec);
+						}
 					}else {
 						let methodName = methodDeclNode.name.getText(this._sourceFile);
 						if (methodName === 'ready') {
@@ -133,7 +139,9 @@ export class PolymerTsTransformer {
 					let propDeclNode = ts.isPropertyDeclaration(node) ? node as ts.PropertyDeclaration : null;
 					if (propDeclNode && RedPill.isDeclaredProperty(propDeclNode)) {
 						let chgRec: TransformChangeRecord = this.transformProperty(propDeclNode);
-						this._transformNodeMap.set(propDeclNode, chgRec);
+						if (chgRec) {
+							this._transformNodeMap.set(propDeclNode, chgRec);
+						}
 					}
 					break;
 				default:
@@ -146,7 +154,8 @@ export class PolymerTsTransformer {
 		}
 	}
 	/**
-	 * This starts the visitor
+	 * Use the visitor pattern to walk each node, if that node is in the transformNodeMap and it has a newNode
+	 * defined, then return that newNode
 	 * @param ctx {ts.TransformationContext}
 	 * @returns {tx.Transformer<ts.SourceFile>}
 	 */
@@ -162,7 +171,7 @@ export class PolymerTsTransformer {
 					if (transformChgRec.notification && transformChgRec.notification.type === NotificationType.INFO) {
 						console.log(chalk.processing(transformChgRec.notification.msg));
 					}else if (transformChgRec.notification && transformChgRec.notification.type === NotificationType.WARN) {
-						console.log(chalk.warn(transformChgRec.notification.msg));
+						console.log(chalk.warning(transformChgRec.notification.msg));
 					}else if (transformChgRec.notification && transformChgRec.notification.type === NotificationType.ERROR) {
 						console.log(chalk.error(transformChgRec.notification.msg));
 					}else {
@@ -171,17 +180,16 @@ export class PolymerTsTransformer {
 					return newNode;
 				}else if (newNode && newNode.kind !== node.kind) {
 					if (transformChgRec.changeType === TransformChangeType.MethodReplace) {
+						console.log(chalk.processing(transformChgRec.notification.msg));
 						return newNode;
 					}else {
-						console.log(chalk.warn('Seems we need to replace a node'));
+						let warn = chalk.warning('Seems we need to replace a node: ' + node.getText(this._sourceFile));
+						console.log(warn);
 					}
+				}else {
+					let warn = chalk.warning('Found a change record for \n' + node.getText(this._sourceFile) + '\n but no newNode was defined');
+					console.log(warn);
 				}
-			}else {
-				let notify: Notification = {
-					type: NotificationType.ERROR,
-					msg: 'No Transform record found for node ' + node.getText(this._sourceFile)
-				};
-				this._notifications.push(notify);
 			}
 			return node;
 		}
@@ -191,41 +199,76 @@ export class PolymerTsTransformer {
 	}
 
 	transformClassDecl(classDecl: ts.ClassDeclaration): TransformChangeRecord {
-		let newClassDecl: ts.ClassDeclaration = null;
 		let chgRec: TransformChangeRecord = null;
 		if (classDecl && ts.isClassDeclaration(classDecl)) {
-			let newDecorator = transformUtils.renameDecorator(classDecl, transformUtils.polymerTsRegEx.component, 'customElement', this._sourceFile);
-			let decorators = classDecl.decorators;
-			if (newDecorator && decorators && decorators.length > 0) {
+			let newDecorator: ts.Decorator = transformUtils.renameDecorator(classDecl, transformUtils.polymerTsRegEx.component, 'customElement', this._sourceFile);
+			if (newDecorator) {
+				let notify: Notification = {
+					type: NotificationType.INFO,
+					msg: 'Updated the class statement decorator'
+				};
 				let behaviors: RedPill.IncludedBehavior[] = transformUtils.getComponentBehaviors(classDecl, this._sourceFile);
+
 				let heritages: ts.HeritageClause[] = [].concat(classDecl.heritageClauses);
-				let newHeritage: ts.HeritageClause[] = [];
-				if (decorators.length > 1) { // We have behaviors here
-					if (this.options.applyGestureEventListenersMixin && this.options.applyDeclarativeEventListenersMixin) {
-
-
-
-						let extendsExpression = ts.createExpressionWithTypeArguments(
-							/* ts.TypeNode[] */ undefined,
-							/* ts.Expression */ undefined
-						)
-						let newHeritageClause = ts.createHeritageClause(
-							ts.SyntaxKind.ExtendsKeyword,
-							/* ts.ExpressionWithTypeArguments[] */ [extendsExpression]
-						);
+				let newHeritages: ts.HeritageClause[] = [];
+				if (behaviors.length > 1) { // We have behaviors here
+					let newHeritageClause: ts.HeritageClause = null;
+					if (this.options.applyDeclarativeEventListenersMixin) {
+						// let extendsExpression = ts.createExpressionWithTypeArguments(
+						// 	/* ts.TypeNode[] */ undefined,
+						// 	/* ts.Expression */ undefined
+						// );
+						// newHeritageClause = ts.createHeritageClause(
+						// 	ts.SyntaxKind.ExtendsKeyword,
+						// 	/* ts.ExpressionWithTypeArguments[] */ [extendsExpression]
+						// );
 					}
-				}else if (decorators.length === 1) { // No Behaviors defined
-					newHeritage = heritages;
+					if (this.options.applyGestureEventListenersMixin) {
+						// let extendsExpression = ts.createExpressionWithTypeArguments(
+						// 	/* ts.TypeNode[] */ undefined,
+						// 	/* ts.Expression */ undefined
+						// );
+						// newHeritageClause = ts.updateHeritageClause(
+						// 	newHeritageClause,
+						// 	[extendsExpression],
+						// );
+					}
+				}else if (behaviors.length === 1 && !this.options.changeComponentClassExtension) {
+					newHeritages = heritages;
+				}else if (behaviors.length === 1 && this.options.changeComponentClassExtension) {
+					if (heritages.length === 1) {
+						let propAccessExp = ts.createPropertyAccess(
+							ts.createIdentifier('Polymer'),
+							ts.createIdentifier('Element')
+						);
+						let expWithArgs = ts.createExpressionWithTypeArguments(
+							[],
+							propAccessExp
+						);
+						let newHeritage = ts.updateHeritageClause(
+							heritages[0],
+							[expWithArgs]
+						);
+						newHeritages.push(newHeritage);
+						notify.msg += ' and extension statement';
+					}
 				}
-				newClassDecl = ts.updateClassDeclaration(
+				let newClassDecl = ts.updateClassDeclaration(
 					/* ts.ClassDeclaration */ classDecl,
 					/* ts.Decorator[] */ [newDecorator],
 					/* ts.Modifier[] */ classDecl.modifiers,
 					/* ts.Identifier */ classDecl.name,
 					/* ts.TypeParameterDeclaration */ classDecl.typeParameters,
-					/* ts.HeritageClause[] */ newHeritage,
+					/* ts.HeritageClause[] */ newHeritages,
 					/* ts.ClassElement[] */ classDecl.members
 				);
+				chgRec = {
+					changeType: TransformChangeType.ClassModify,
+					origNode: classDecl,
+					newNode: newClassDecl,
+					notification: notify
+				};
+				this._notifications.push(notify);
 			}
 		}
 		return chgRec;
@@ -235,15 +278,15 @@ export class PolymerTsTransformer {
 		let chgRec: TransformChangeRecord = null;
 		if (methodDecl && ts.isMethodDeclaration(methodDecl)) {
 			let methodName = methodDecl.name.getText(this._sourceFile);
+			let rpCompProp = new RedPill.ComputedProperty(methodDecl);
+			rpCompProp.sourceFile = this._sourceFile;
 			let notify: Notification =  {
 				type: NotificationType.INFO,
-				msg: 'Replaced the ' + methodName + ' with a getter.'
+				msg: 'Computed Property ' + rpCompProp.propertyName + '. Replaced the ' + methodName + ' method with a getter.'
 			};
 			let decorator: ts.Decorator = transformUtils.getPolymerTsDecorator(methodDecl, this._sourceFile);
 			let newDecorators: ts.Decorator[] = [];
 			if (decorator) {
-				let rpCompProp = new RedPill.ComputedProperty(methodDecl);
-				rpCompProp.sourceFile = this._sourceFile;
 				if (transformUtils.decoratorHasObjectArgument(decorator)) { // @computed({type: String})
 					let callExp: ts.CallExpression = <ts.CallExpression> decorator.expression;
 					let objLitExp: ts.ObjectLiteralExpression = <ts.ObjectLiteralExpression> callExp.arguments[0];
@@ -293,10 +336,15 @@ export class PolymerTsTransformer {
 				if (this.options.applyDeclarativeEventListenersMixin) {
 					let rpListener = new RedPill.Listener(methodDecl);
 					rpListener.sourceFile = this._sourceFile;
-					let params: ts.StringLiteral[] = [];
-					params.push(ts.createStringLiteral(rpListener.eventName));
-					params.push(ts.createStringLiteral(rpListener.elementId));
-					/* let newDecorator: ts.Decorator = transformUtils.updateDecorator(decorator, 'listen', params, this._sourceFile);
+					let params: ts.Expression[] = [];
+					params.push(rpListener.eventDeclaration);
+					let elementId = rpListener.elementId;
+					if (!elementId) {
+						params.push(ts.createIdentifier('document'));
+					}else {
+						params.push(ts.createStringLiteral(rpListener.elementId));
+					}
+					let newDecorator: ts.Decorator = transformUtils.updateDecorator(decorator, 'listen', params, this._sourceFile);
 					let newMethod = ts.updateMethod(
 						methodDecl,
 						[newDecorator],
@@ -309,30 +357,31 @@ export class PolymerTsTransformer {
 						methodDecl.type,
 						methodDecl.body
 					);
-					let notification: Notification = {
+					let notify: Notification = {
 						type: NotificationType.INFO,
-						msg: 'Updated decorator for ' + rpListener.methodName
+						msg: 'Updated listen decorator for ' + rpListener.methodName
 					};
-					this._notifications.push(notification);
 					chgRec = {
 						changeType: TransformChangeType.MethodModify,
 						origNode: methodDecl,
 						newNode: newMethod,
-						notification: notification,
+						notification: notify,
 						polymerTsModel: rpListener
-					}; */
-					// TODO: Need to add 2 arguments to the decorator
+					};
+					this._notifications.push(notify);
 				}else {
+					// TODO:
 					let readyMethod = this._findReadyMethod();
-					let listenerChgRec: ListenerAddToReadyChangeRecord = {
-						changeType: TransformChangeType.ListenerAddToReady,
-						origNode: readyMethod,
-						listenerMethod: methodDecl,
-						createReadyMethod: readyMethod ? false : true,
-						eventName: null,
-						eventTarget: null
+					if (readyMethod) {
+						let listenerChgRec: ListenerAddToReadyChangeRecord = {
+							changeType: TransformChangeType.ListenerAddToReady,
+							origNode: readyMethod,
+							listenerMethod: methodDecl,
+							createReadyMethod: readyMethod ? false : true,
+							eventName: null,
+							eventTarget: null
+						}
 					}
-					chgRec = listenerChgRec;
 				}
 			}
 		}
@@ -356,8 +405,8 @@ export class PolymerTsTransformer {
 					let argName = callExp.arguments[0].getText(this._sourceFile);
 					argName = argName ? argName.replace(/[\'"]*/g, '') : argName;
 					const existPropChgRec: TransformChangeRecord = this._findExistingDeclaredProperty(argName);
-					if (existPropChgRec && existPropChgRec.newNode) {
-						let existingProp = existPropChgRec.newNode ? <ts.PropertyDeclaration> existPropChgRec.newNode : null;
+					if (existPropChgRec) {
+						let existingProp = existPropChgRec.newNode ? <ts.PropertyDeclaration> existPropChgRec.newNode : <ts.PropertyDeclaration> existPropChgRec.origNode;
 						if (existingProp) {
 							existingProp = transformUtils.addPropertyToPropertyDecl(existingProp, 'observer', methodName, this._sourceFile);
 							existPropChgRec.newNode = existingProp;
@@ -369,14 +418,9 @@ export class PolymerTsTransformer {
 						}else {
 							notify = {
 								type: NotificationType.ERROR,
-								msg: 'Found a change record for ' + argName + ' but no new node was defined'
+								msg: 'Found a change record for property ' + argName + ', no new node was defined transforming observer ' + rpObserver.methodName + '!'
 							};
 						}
-					}else {
-						notify = {
-							type: NotificationType.ERROR,
-							msg: 'Found a change record for property ' + argName + ', no new node was defined transforming observer ' + rpObserver.methodName + '!'
-						};
 					}
 				}else if (rpObserver.params && (rpObserver.params.length > 1 || isComplex)) {
 					let params: ts.StringLiteral[] = [];
@@ -391,18 +435,7 @@ export class PolymerTsTransformer {
 						msg: 'Updated the observe decorator for the ' + rpObserver.methodName + ' method'
 					}
 				}
-				let newMethod = ts.updateMethod(
-					methodDecl,
-					newDecorators,
-					methodDecl.modifiers,
-					methodDecl.asteriskToken,
-					methodDecl.name,
-					methodDecl.questionToken,
-					methodDecl.typeParameters,
-					methodDecl.parameters,
-					methodDecl.type,
-					methodDecl.body
-				)
+				let newMethod = transformUtils.updateMethodDecorator(methodDecl, newDecorators);
 				chgRec = {
 					changeType: TransformChangeType.MethodModify,
 					origNode: methodDecl,
@@ -421,30 +454,30 @@ export class PolymerTsTransformer {
 			let rpProp = new RedPill.Property(propertyDecl);
 			rpProp.sourceFile = this._sourceFile;
 			let notify: Notification = null;
-			chgRec = {
-				changeType: TransformChangeType.PropertyAddValueInitializer,
-				origNode: propertyDecl,
-				newNode: null,
-			};
 			if (rpProp.containsValueArrayLiteral || rpProp.containsValueFunction || rpProp.containsValueObjectDeclaration || rpProp.containsValueBoolean || rpProp.containsValueStringLiteral) {
 				let valueInit = transformUtils.getPropertyValueExpression(propertyDecl, this._sourceFile);
 				let propDelValue = transformUtils.removePropertyFromPropertyDecl(propertyDecl, 'value', this._sourceFile);
+				let propWithInitializer = transformUtils.addInitializerToPropertyDecl(propDelValue, valueInit);
 				notify = {
 					type: NotificationType.INFO,
 					msg: 'Property ' + rpProp.name + ' has a value defined. Moved initializer to property instead of decorator'
 				};
-				chgRec.notification = notify;
-				let propWithInitializer = transformUtils.addInitializerToPropertyDecl(propDelValue, valueInit);
-				chgRec.newNode = propWithInitializer;
+				chgRec = {
+					changeType: TransformChangeType.PropertyAddValueInitializer,
+					origNode: propertyDecl,
+					newNode: propWithInitializer,
+					notification: notify
+				};
 			}else {
+				// No changes required
 				notify = {
 					type: NotificationType.INFO,
-					msg: 'No modifications required for declared property ' + rpProp.name
-				}
+					msg: 'Property ' + rpProp.name + ' no modifications required'
+				};
 				chgRec = {
 					changeType: TransformChangeType.PropertyModify,
 					origNode: propertyDecl,
-					newNode: propertyDecl,
+					newNode: null,
 					notification: notify
 				};
 			}
