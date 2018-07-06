@@ -1,6 +1,6 @@
 import * as ts from 'typescript';
 import {RedPill} from 'polymerts-models';
-import {TransformChangeType, RefNodeCreateChangeRecord, PropertyOptions} from './custom-types';
+import {TransformChangeType, RefNodeCreateChangeRecord, PropertyOptions, TransformChangeRecord, ConverterOptions} from './custom-types';
 
 /**
  * Collection of regular expressions to match PolymerTs Decorators
@@ -251,19 +251,6 @@ export function addInitializerToPropertyDecl(propDecl: ts.PropertyDeclaration, i
 		)
 	}
 	return newProp;
-}
-/**
- * Get the class name from a ClassDeclaration
- * @param classDecl {ts.ClassDeclaration}
- * @param sf {ts.SourceFile}
- * @return {string}
- */
-export function getClassNameFromClassDeclaration(classDecl: ts.ClassDeclaration, sf: ts.SourceFile): string {
-	let className = null;
-	if (classDecl) {
-		className = classDecl.name.getText(sf);
-	}
-	return className;
 }
 /**
  * Get the value property from a property decorator argument. The return value will generally
@@ -609,4 +596,86 @@ export function isComplexObserver(decorator: ts.Decorator, sf: ts.SourceFile): b
 		}
 	}
 	return isComplex;
+}
+/**
+ * Get the class name from a ClassDeclaration
+ * @param classDecl {ts.ClassDeclaration}
+ * @param sf {ts.SourceFile}
+ * @return {string}
+ */
+export function getClassNameFromClassDeclaration(classDecl: ts.ClassDeclaration, sf: ts.SourceFile): string {
+	let className = null;
+	if (classDecl) {
+		className = classDecl.name.getText(sf);
+	}
+	return className;
+}
+/**
+ * Loop through the members of classDecl, if a node is in nodeMap then add it to the new members
+ * instead of the existing node. Otherwise add the existing node
+ * @param classDecl {ts.ClassDeclaration}
+ * @param nodeMap {Map<ts.Node, TransformChangeRecord>}
+ * @param sf {ts.SourceFile}
+ * @return {ts.ClassElement[]}
+ */
+export function updateClassMembers(classDecl: ts.ClassDeclaration, nodeMap: Map<ts.Node, TransformChangeRecord>, sf: ts.SourceFile): ts.ClassElement[] {
+	let newMembers = [];
+	if (classDecl && nodeMap) {
+		let members = classDecl.members;
+		for (let i = 0; i < members.length; i++) {
+			let member: ts.Node = members[i];
+			let chgRec = nodeMap.get(member);
+			if (chgRec && chgRec.newNode) {
+				let newNode = chgRec.newNode;
+				if (ts.isClassElement(newNode)) {
+					// console.log('Adding ' + ts.SyntaxKind[newNode.kind] + ' to newMembers');
+					newMembers.push(chgRec.newNode);
+				}else {
+					console.log('Node ' + ts.SyntaxKind[newNode.kind] + ' not a class element')
+				}
+			}else {
+				// console.log('Adding original ' + ts.SyntaxKind[member.kind] + ' to newMembers');
+				newMembers.push(member);
+			}
+		}
+	}
+	return newMembers;
+}
+/**
+ * Get the SINGLE heritage clause (i.e. `extends SomeOther.Element`). If the changeComponentClassExtension option
+ * is true, then replace what the class extends with `Polymer.Element`
+ * @param classDecl {ts.ClassDeclaration}
+ * @param options {ConverterOptions}
+ * @param sf {ts.SourceFile}
+ * @return {ts.HeritageClause[]}
+ */
+export function getClassHeritageExtendsPolymer(classDecl: ts.ClassDeclaration, options: ConverterOptions, sf: ts.SourceFile): ts.HeritageClause[] {
+	let newHeritages = [];
+	if (classDecl) {
+		let heritages = [].concat(classDecl.heritageClauses);
+		if (heritages.length === 1) {
+			let propAccessExp: ts.PropertyAccessExpression = null;
+			if (options.changeComponentClassExtension) {
+				propAccessExp = ts.createPropertyAccess(
+					ts.createIdentifier('Polymer'),
+					ts.createIdentifier('Element')
+				);
+			}else {
+				let heritage: ts.HeritageClause = heritages[0];
+				propAccessExp = <ts.PropertyAccessExpression> heritage.types[0].expression;
+			}
+			let expWithArgs = ts.createExpressionWithTypeArguments(
+				[],
+				propAccessExp
+			);
+			let newHeritage = ts.updateHeritageClause(
+				heritages[0],
+				[expWithArgs]
+			);
+			newHeritages.push(newHeritage);
+		}else { // may include `implements`
+
+		}
+	}
+	return newHeritages;
 }

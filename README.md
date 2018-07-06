@@ -23,14 +23,29 @@ We make a few assumptions while transforming PolymerTS files to use polymer-deco
 * Declared Properties are defined before all other types of decorated items (i.e. Observer, Listener, Computed)
 * If there is a `ready` function, it is defined before all listener decorated items
 
+##  Current Limitations
+
+**_This project is still in active development_**. As such there are certain limitations which will eventually be addressed:
+
+* Behavior:
+	* If behaviors are included in your existing element these currently **will not** be applied as mixins to the class declaration
+* Property:
+	* If your property decorator has a `value` key that is `null` or `undefined`, it will not be removed and per the polymer-decorators documentation may not function properly
+* Computed Property:
+	* If your computed property decorator has an object inside it and that object has a `value` key, it will not be removed and my not function properly
+	* References to the arguments defined in the original PolymerTs method body are not updated with the `this` keyword
+* Listener
+	* If an element ID is not defined in the PolymerTs listener, we're currently adding `document` as the target
+* Polymer 2.0 Deprecated methods
+	* We don't currently change these to the Polymer 2.0 supported pattern
+
 ## Usage
 
 ### Simple Usage
 
 ```js
 const toPolymerDecorators = require('polymerts-to-polymer-decorators');
-let options = null;
-toPolymerDecorators.convertToPolymerDecorators('src/**/*.ts', options);
+toPolymerDecorators.convertToPolymerDecorators('src/**/*.ts', null);
 ```
 
 ### Usage with Options

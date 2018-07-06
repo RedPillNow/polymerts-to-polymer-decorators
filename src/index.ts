@@ -87,7 +87,7 @@ function _setOptions(opts): ConverterOptions {
 		applyDeclarativeEventListenersMixin: true,
 		applyGestureEventListenersMixin: false,
 		pathToBowerComponents: '../../bower_components/',
-		changeComponentClassExtension: true,
+		changeComponentClassExtension: false,
 		glob: {
 			ignore: [
 				'bower_components/**/*.*',
@@ -130,9 +130,9 @@ function _getFileArray(pathGlob) {
 // 	}
 // });
 let files = [
-	'src/data/app/elements/dig-person-avatar/*.ts',
+	// 'src/data/app/elements/dig-person-avatar/*.ts',
 	// 'src/data/app/elements/dig-app-site/*.ts',
-	// 'src/data/app/elements/dig-app/*.ts',
+	'src/data/app/elements/dig-app/*.ts',
 	// 'src/data/app/elements/dig-animated-pages-behavior/*.ts'
 ];
 // getComponents(files, {outputPath: './docs/'});
