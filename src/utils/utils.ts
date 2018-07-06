@@ -2,6 +2,10 @@ import * as ts from 'typescript';
 import {RedPill} from 'polymerts-models';
 import {TransformChangeType, RefNodeCreateChangeRecord, PropertyOptions} from './custom-types';
 
+/**
+ * Collection of regular expressions to match PolymerTs Decorators
+ * @type {Object<string,RegExp}
+ */
 export const polymerTsRegEx = {
 	component: /(component\s*\((?:['"]{1}(.*)['"]{1})\))/,
 	property: /(property\s*\(({[a-zA-Z0-9:,\s]*})\)\s*([\w\W]*);)/,
@@ -10,8 +14,13 @@ export const polymerTsRegEx = {
 	listen: /(listen\(([\w.\-'"]*)\))/,
 	behavior: /(behavior\s*\((...*)\))/
 };
-
-export function getArgsFromNode(paramsFromNode: ts.Decorator|ts.MethodDeclaration, sf: ts.SourceFile) {
+/**
+ * Get the arguments from a Decorator or MethodDeclaration
+ * @param paramsFromNode {ts.Decorator | ts.MethodDeclaration}
+ * @param sf {ts.SourceFile}
+ * @return {ts.StringLiteral[]}
+ */
+export function getArgsFromNode(paramsFromNode: ts.Decorator|ts.MethodDeclaration, sf: ts.SourceFile): ts.StringLiteral[] {
 	let newArgs: ts.StringLiteral[] = [];
 	if (ts.isDecorator(paramsFromNode)) {
 		const dec: ts.Decorator = <ts.Decorator> paramsFromNode;
@@ -44,8 +53,17 @@ export function getArgsFromNode(paramsFromNode: ts.Decorator|ts.MethodDeclaratio
 	}
 	return newArgs;
 }
-
-export function updateDecorator(existingDecorator: ts.Decorator, decoratorName: string, params: ts.Expression[], sf: ts.SourceFile) {
+/**
+ * Update a decorator with a new name and/or parameters
+ * @param existingDecorator {ts.Decorator} decorator to update
+ * @param decoratorName {string} new decorator name
+ * @param params {ts.Expression[]} new parameters to add to the decorator
+ * @param sf {ts.SourceFile}
+ * @return {ts.Decorator}
+ * @todo decorator name and params should be able to be null, then we just update the
+ * CallExpression. This would negate renameDecorator
+ */
+export function updateDecorator(existingDecorator: ts.Decorator, decoratorName: string, params: ts.Expression[], sf: ts.SourceFile): ts.Decorator {
 	let newDecorator: ts.Decorator = null;
 	if (decoratorName && existingDecorator) {
 		const newIdent = ts.createIdentifier(decoratorName);
@@ -62,8 +80,17 @@ export function updateDecorator(existingDecorator: ts.Decorator, decoratorName: 
 	}
 	return newDecorator;
 }
-
-export function renameDecorator(parentNode: ts.Node, polymerTsRegEx: RegExp, newDecoratorText: string, sf: ts.SourceFile) {
+/**
+ *
+ * @param parentNode {ts.Node} decorator's parent node
+ * @param polymerTsRegEx {RegExp}
+ * @param newDecoratorText {string}
+ * @param sf {ts.SourceFile}
+ * @return ts.Decorator
+ * @todo instead of creating a new CallExpression, maybe we should update the
+ * existing CallExpression
+ */
+export function renameDecorator(parentNode: ts.Node, polymerTsRegEx: RegExp, newDecoratorText: string, sf: ts.SourceFile): ts.Decorator {
 	let decorators = parentNode.decorators;
 	let newDecorator: ts.Decorator = null;
 	for (let i = 0; i < decorators.length; i++) {
@@ -84,8 +111,14 @@ export function renameDecorator(parentNode: ts.Node, polymerTsRegEx: RegExp, new
 	}
 	return newDecorator;
 }
-
-export function updateMethodDecorator(methodDecl: ts.MethodDeclaration, newDecorators: ts.Decorator[]) {
+/**
+ * Update a MethodDeclaration with new decorators
+ * @param methodDecl {ts.MethodDeclaration} the method to update
+ * @param newDecorators {ts.Decorator[]} the new decorators to add
+ * @return {ts.MethodDeclaration}
+ * @todo this seems kind-of extremely simple... what does it save us?
+ */
+export function updateMethodDecorator(methodDecl: ts.MethodDeclaration, newDecorators: ts.Decorator[]): ts.MethodDeclaration {
 	return ts.updateMethod(
 		methodDecl,
 		newDecorators,
@@ -99,7 +132,14 @@ export function updateMethodDecorator(methodDecl: ts.MethodDeclaration, newDecor
 		methodDecl.body
 	);
 }
-
+/**
+ * Add a property to a property decorator argument
+ * @param propDecl {ts.PropertyDeclaration} the property to update
+ * @param newPropName {string} new name for a property
+ * @param newPropInitializer {string} new property initialiazer
+ * @param sf {ts.SourceFile}
+ * @return {ts.PropertyDeclaration}
+ */
 export function addPropertyToPropertyDecl(propDecl: ts.PropertyDeclaration, newPropName: string, newPropInitializer: string, sf: ts.SourceFile): ts.PropertyDeclaration {
 	let updatedProp = null;
 	if (propDecl) {
@@ -145,7 +185,13 @@ export function addPropertyToPropertyDecl(propDecl: ts.PropertyDeclaration, newP
 	}
 	return updatedProp;
 }
-
+/**
+ * Remove a property from a property decorator argument
+ * @param propDecl {ts.PropertyDeclaration}
+ * @param propertyName {string} the property name to remove
+ * @param sf {ts.SourceFile}
+ * @return {ts.PropertyDeclaration}
+ */
 export function removePropertyFromPropertyDecl(propDecl: ts.PropertyDeclaration, propertyName: string, sf: ts.SourceFile): ts.PropertyDeclaration {
 	let newProp = propDecl;
 	if (propDecl) {
@@ -185,7 +231,12 @@ export function removePropertyFromPropertyDecl(propDecl: ts.PropertyDeclaration,
 	}
 	return newProp;
 }
-
+/**
+ * Add an initializer to a property decorator
+ * @param propDecl {ts.PropertyDeclaration}
+ * @param initializer {ts.Expression}
+ * @return {ts.PropertyDeclaration}
+ */
 export function addInitializerToPropertyDecl(propDecl: ts.PropertyDeclaration, initializer: ts.Expression): ts.PropertyDeclaration {
 	let newProp = propDecl;
 	if (propDecl) {
@@ -201,7 +252,13 @@ export function addInitializerToPropertyDecl(propDecl: ts.PropertyDeclaration, i
 	}
 	return newProp;
 }
-
+/**
+ * Get the value property from a property decorator argument. The return value will generally
+ * be used in addInitializerToPropertyDecl
+ * @param propDecl {ts.PropertyDeclaration}
+ * @param sf {ts.SourceFile}
+ * @return {ts.Expression}
+ */
 export function getPropertyValueExpression(propDecl: ts.PropertyDeclaration, sf: ts.SourceFile): ts.Expression {
 	let valueExp: ts.Expression = null;
 	if (propDecl) {
@@ -221,8 +278,13 @@ export function getPropertyValueExpression(propDecl: ts.PropertyDeclaration, sf:
 	}
 	return valueExp;
 }
-
-export function getComponentBehaviors(classDecl: ts.ClassDeclaration, sf: ts.SourceFile) {
+/**
+ * Get a list of behaviors from the ClassDeclaration. PolymerTS defines these as behavior decorators
+ * @param classDecl {ts.ClassDeclaration}
+ * @param sf {ts.SourceFile}
+ * @return {RedPill.IncludedBehavior[]}
+ */
+export function getComponentBehaviors(classDecl: ts.ClassDeclaration, sf: ts.SourceFile): RedPill.IncludedBehavior[] {
 	let decorators = classDecl.decorators;
 	let behaviors: RedPill.IncludedBehavior[] = [];
 	if (decorators && decorators.length > 0) {
@@ -240,7 +302,13 @@ export function getComponentBehaviors(classDecl: ts.ClassDeclaration, sf: ts.Sou
 	}
 	return behaviors;
 }
-
+/**
+ *
+ * @param origNode
+ * @param newNode
+ * @param refPath
+ * @deprecated
+ */
 export function addRefNodeChangeRecord(origNode: ts.Node, newNode: ts.Node, refPath: string) {
 	let refNodeChg: RefNodeCreateChangeRecord = {
 		changeType: TransformChangeType.AddTSReferenceTag,
@@ -250,7 +318,11 @@ export function addRefNodeChangeRecord(origNode: ts.Node, newNode: ts.Node, refP
 	};
 	this._changeRecords.push(refNodeChg);
 }
-
+/**
+ * Determine if a decorator has an ObjectLiteral as an argument
+ * @param decorator {ts.Decorator}
+ * @return {boolean}
+ */
 export function decoratorHasObjectArgument(decorator: ts.Decorator): boolean {
 	let hasObjectArg = false;
 	if (decorator) {
@@ -268,7 +340,11 @@ export function decoratorHasObjectArgument(decorator: ts.Decorator): boolean {
 	}
 	return hasObjectArg;
 }
-
+/**
+ * If a decorator has an ObjectLiteral as an argument, get that argument and return it
+ * @param decorator {ts.Decorator}
+ * @return {ts.ObjectLiteralExpression}
+ */
 export function getDecoratorObjectArgument(decorator: ts.Decorator): ts.ObjectLiteralExpression {
 	let obj: ts.ObjectLiteralExpression = null;
 	if (decorator) {
@@ -286,7 +362,12 @@ export function getDecoratorObjectArgument(decorator: ts.Decorator): ts.ObjectLi
 	}
 	return obj;
 }
-
+/**
+ * Determine if a decorator is for a PolymerTS component
+ * @param decorator {ts.Decorator}
+ * @param sf {ts.SourceFile}
+ * @return {boolean}
+ */
 export function isComponentDecorator(decorator: ts.Decorator, sf: ts.SourceFile): boolean {
 	let isComponent = false;
 	if (decorator) {
@@ -298,7 +379,12 @@ export function isComponentDecorator(decorator: ts.Decorator, sf: ts.SourceFile)
 	}
 	return isComponent;
 }
-
+/**
+ * Determine if a decorator is for a PolymerTS Computed Property
+ * @param decorator {ts.Decorator}
+ * @param sf {ts.SourceFile}
+ * @return {boolean}
+ */
 export function isComputedDecorator(decorator: ts.Decorator, sf: ts.SourceFile): boolean {
 	let isComputed = false;
 	if (decorator) {
@@ -310,7 +396,12 @@ export function isComputedDecorator(decorator: ts.Decorator, sf: ts.SourceFile):
 	}
 	return isComputed;
 }
-
+/**
+ * Determine if a decorator is for a PolymerTS Observer
+ * @param decorator {ts.Decorator}
+ * @param sf {ts.SourceFile}
+ * @return {boolean}
+ */
 export function isObserverDecorator(decorator: ts.Decorator, sf: ts.SourceFile): boolean {
 	let isObserver = false;
 	if (decorator) {
@@ -322,7 +413,12 @@ export function isObserverDecorator(decorator: ts.Decorator, sf: ts.SourceFile):
 	}
 	return isObserver;
 }
-
+/**
+ * Determine if a decorator is for a PolymerTS Behavior
+ * @param decorator {ts.Decorator}
+ * @param sf {ts.SourceFile}
+ * @return {boolean}
+ */
 export function isBehaviorDecorator(decorator: ts.Decorator, sf: ts.SourceFile): boolean {
 	let isBehavior = false;
 	if (decorator) {
@@ -334,7 +430,12 @@ export function isBehaviorDecorator(decorator: ts.Decorator, sf: ts.SourceFile):
 	}
 	return isBehavior;
 }
-
+/**
+ * Determine if a decorator is a PolymerTS Listener
+ * @param decorator {ts.Decorator}
+ * @param sf {ts.SourceFile}
+ * @return {boolean}
+ */
 export function isListenerDecorator(decorator: ts.Decorator, sf: ts.SourceFile): boolean {
 	let isListener = false;
 	if (decorator) {
@@ -346,7 +447,12 @@ export function isListenerDecorator(decorator: ts.Decorator, sf: ts.SourceFile):
 	}
 	return isListener;
 }
-
+/**
+ * Determine if a decorator is a PolymerTS Property
+ * @param decorator {ts.Decorator}
+ * @param sf {ts.SourceFile}
+ * @return {boolean}
+ */
 export function isPropertyDecorator(decorator: ts.Decorator, sf: ts.SourceFile): boolean {
 	let isProperty = false;
 	if (decorator) {
@@ -358,7 +464,13 @@ export function isPropertyDecorator(decorator: ts.Decorator, sf: ts.SourceFile):
 	}
 	return isProperty;
 }
-
+/**
+ * Get the PolymerTS decorator from a node. If there isn't a decorator that matches the regular
+ * expressions in polymerTsRegEx return null
+ * @param node {ts.Node}
+ * @param sf {ts.SourceFile}
+ * @return {ts.Decorator}
+ */
 export function getPolymerTsDecorator(node: ts.Node, sf: ts.SourceFile): ts.Decorator {
 	let decorator: ts.Decorator = null;
 	if (node) {
@@ -401,7 +513,14 @@ export function getPolymerTsDecorator(node: ts.Node, sf: ts.SourceFile): ts.Deco
 	}
 	return decorator;
 }
-
+/**
+ * Create a new property with decorator
+ * @param objExp {ts.ObjectLiteralExpression}
+ * @param propertyName {string}
+ * @param sf {ts.SourceFile}
+ * @return {ts.PropertyDeclaration}
+ * @deprecated
+ */
 export function createProperty(objExp: ts.ObjectLiteralExpression, propertyName: string, sf: ts.SourceFile): ts.PropertyDeclaration {
 	let ident: ts.Identifier = ts.createIdentifier('property');
 	let callExp: ts.CallExpression = ts.createCall(
@@ -435,7 +554,13 @@ export function createProperty(objExp: ts.ObjectLiteralExpression, propertyName:
 	);
 	return newProp;
 }
-
+/**
+ * Create a JavaScript Object from an ObjectLiteralExpression
+ * @param objLitExp {ts.ObjectLiteralExpression}
+ * @param sf {ts.SourceFile}
+ * @return {PropertyOptions}
+ * @deprecated
+ */
 export function objectLiteralExpressionToObjectLiteral(objLitExp: ts.ObjectLiteralExpression, sf: ts.SourceFile): PropertyOptions {
 	let opts: PropertyOptions = {};
 	if (objLitExp && objLitExp.properties) {
@@ -447,7 +572,13 @@ export function objectLiteralExpressionToObjectLiteral(objLitExp: ts.ObjectLiter
 	}
 	return opts;
 }
-
+/**
+ * Determine if a PolymerTS Observer is a complex Observer. Meaning does it reference
+ * a sub-property
+ * @param decorator {ts.Decorator}
+ * @param sf {ts.SourceFile}
+ * @return {boolean}
+ */
 export function isComplexObserver(decorator: ts.Decorator, sf: ts.SourceFile): boolean {
 	let isComplex = false;
 	if (decorator) {
