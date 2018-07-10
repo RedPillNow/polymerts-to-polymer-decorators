@@ -521,7 +521,7 @@ export function getPolymerTsDecorator(node: ts.Node, sf: ts.SourceFile): ts.Deco
  * @return {ts.PropertyDeclaration}
  * @deprecated
  */
-export function createProperty(objExp: ts.ObjectLiteralExpression, propertyName: string, sf: ts.SourceFile): ts.PropertyDeclaration {
+export function createDeclaredProperty(objExp: ts.ObjectLiteralExpression, propertyName: string, sf: ts.SourceFile): ts.PropertyDeclaration {
 	let ident: ts.Identifier = ts.createIdentifier('property');
 	let callExp: ts.CallExpression = ts.createCall(
 		/* ts.Expression */ ident,
@@ -674,8 +674,54 @@ export function getClassHeritageExtendsPolymer(classDecl: ts.ClassDeclaration, o
 			);
 			newHeritages.push(newHeritage);
 		}else { // may include `implements`
-
+			// TODO:
 		}
 	}
 	return newHeritages;
+}
+/**
+ * Wrap the existing heritage clause in a mixin
+ * @param heritageCl {ts.HeritageClause}
+ * @param rpBehavior {string}
+ * @param sf {ts.SourceFile}
+ * @return {ts.HeritageClause}
+ */
+export function addBehaviorToHeritage(heritageCl: ts.HeritageClause, rpBehavior: RedPill.IncludedBehavior, sf: ts.SourceFile): ts.HeritageClause {
+	let newHeritage: ts.HeritageClause = heritageCl;
+	if (heritageCl && rpBehavior && heritageCl.types && heritageCl.types.length > 0) {
+		let types = heritageCl.types;
+		let type: ts.ExpressionWithTypeArguments = types[0];
+		let newTypes: ts.ExpressionWithTypeArguments[] = [];
+		if (ts.isIdentifier(type.expression) || ts.isPropertyAccessExpression(type.expression)) { // extends "someClass/some.class"
+			let newCall = ts.createCall(
+				/* ts.Expression */ rpBehavior.propertyAccessExpression,
+				/* ts.TypeNode[] */ undefined,
+				/* ts.Expression[] args */ [type.expression]
+			);
+			let newType = ts.updateExpressionWithTypeArguments(
+				/* ts.ExpressionWithTypeArgs */ type,
+				/* ts.TypeNode[] */ type.typeArguments,
+				/* ts.Expression */ newCall
+			);
+			newTypes.push(newType);
+		}else if (ts.isCallExpression(type.expression)) { // extends "someMixin(someOtherMixin/someClass)"
+			let newCall = ts.createCall(
+				/* ts.Expression */ rpBehavior.propertyAccessExpression,
+				/* ts.TypeNode[] */ undefined,
+				/* ts.Expression[] args */ [type.expression]
+			);
+			let newType = ts.updateExpressionWithTypeArguments(
+				/* ts.ExpressionWithTypeArgs */ type,
+				/* ts.TypeNode[] */ type.typeArguments,
+				/* ts.Expression */ newCall
+			);
+			newTypes.push(newType);
+		}
+
+		newHeritage = ts.updateHeritageClause(
+			/* ts.HeritageClause */ heritageCl,
+			/* ts.ExpressionWithTypeArguments[] */ newTypes
+		);
+	}
+	return newHeritage;
 }

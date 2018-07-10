@@ -84,7 +84,7 @@ function _setOptions(opts): ConverterOptions {
 		conversionType: 'polymer-decorators',
 		targetPolymerVersion: 2,
 		moveSinglePropertyObserversToProperty: true,
-		applyDeclarativeEventListenersMixin: true,
+		applyDeclarativeEventListenersMixin: false,
 		applyGestureEventListenersMixin: false,
 		pathToBowerComponents: '../../bower_components/',
 		changeComponentClassExtension: false,

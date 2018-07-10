@@ -279,37 +279,40 @@ export class PolymerTsTransformer {
 
 				let heritages: ts.HeritageClause[] = [].concat(classDecl.heritageClauses);
 				let newHeritages: ts.HeritageClause[] = [];
+				let heritage: ts.HeritageClause = heritages[0];
+				let newHeritage: ts.HeritageClause = heritage;
 				if (behaviors.length > 0) { // We have behaviors here
-					newHeritages = transformUtils.getClassHeritageExtendsPolymer(classDecl, this.options, this._sourceFile);
+					if (this.options.changeComponentClassExtension) {
+						newHeritages = transformUtils.getClassHeritageExtendsPolymer(classDecl, this.options, this._sourceFile);
+					}else {
+						newHeritages = heritages;
+					}
 
 					for (let i = 0; i < behaviors.length; i++) {
-						let behavior: RedPill.IncludedBehavior = behaviors[i];
+						if (i === 0 && !newHeritage) {
+							newHeritage = transformUtils.addBehaviorToHeritage(heritage, behaviors[i], this._sourceFile);
+						}else {
+							newHeritage = transformUtils.addBehaviorToHeritage(newHeritage, behaviors[i], this._sourceFile);
+						}
 					}
+					newHeritages = [newHeritage];
 				}else if (!this.options.changeComponentClassExtension) {
 					newHeritages = heritages;
 				}else {
 					newHeritages = transformUtils.getClassHeritageExtendsPolymer(classDecl, this.options, this._sourceFile);
 					notify.msg += ' and extension statement';
 				}
-				if (this.options.applyDeclarativeEventListenersMixin) {
-					// let extendsExpression = ts.createExpressionWithTypeArguments(
-					// 	/* ts.TypeNode[] */ undefined,
-					// 	/* ts.Expression */ undefined
-					// );
-					// newHeritageClause = ts.createHeritageClause(
-					// 	ts.SyntaxKind.ExtendsKeyword,
-					// 	/* ts.ExpressionWithTypeArguments[] */ [extendsExpression]
-					// );
-				}
 				if (this.options.applyGestureEventListenersMixin) {
-					// let extendsExpression = ts.createExpressionWithTypeArguments(
-					// 	/* ts.TypeNode[] */ undefined,
-					// 	/* ts.Expression */ undefined
-					// );
-					// newHeritageClause = ts.updateHeritageClause(
-					// 	newHeritageClause,
-					// 	[extendsExpression],
-					// );
+					let gestBehavior = new RedPill.IncludedBehavior();
+					gestBehavior.behaviorDeclarationString = 'Polymer.GestureEventListeners';
+					newHeritage = transformUtils.addBehaviorToHeritage(newHeritage, gestBehavior, this._sourceFile);
+					newHeritages = [newHeritage];
+				}
+				if (this.options.applyDeclarativeEventListenersMixin) {
+					let declEvtBehavior = new RedPill.IncludedBehavior();
+					declEvtBehavior.behaviorDeclarationString = 'Polymer.DeclarativeEventListeners';
+					newHeritage = transformUtils.addBehaviorToHeritage(newHeritage, declEvtBehavior, this._sourceFile);
+					newHeritages = [newHeritage];
 				}
 				let newClassDecl = ts.updateClassDeclaration(
 					/* ts.ClassDeclaration */ classDecl,
@@ -527,7 +530,7 @@ export class PolymerTsTransformer {
 			let rpProp = new RedPill.Property(propertyDecl);
 			rpProp.sourceFile = this._sourceFile;
 			let notify: Notification = null;
-			if (rpProp.containsValueArrayLiteral || rpProp.containsValueFunction || rpProp.containsValueObjectDeclaration || rpProp.containsValueBoolean || rpProp.containsValueStringLiteral) {
+			if (rpProp.containsValueArrayLiteral || rpProp.containsValueFunction || rpProp.containsValueObjectDeclaration || rpProp.containsValueBoolean || rpProp.containsValueStringLiteral || rpProp.containsValueNull || rpProp.containsValueUndefined) {
 				let valueInit = transformUtils.getPropertyValueExpression(propertyDecl, this._sourceFile);
 				let propDelValue = transformUtils.removePropertyFromPropertyDecl(propertyDecl, 'value', this._sourceFile);
 				let propWithInitializer = transformUtils.addInitializerToPropertyDecl(propDelValue, valueInit);
@@ -588,7 +591,7 @@ export class PolymerTsTransformer {
 				let keyClassName = transformUtils.getClassNameFromClassDeclaration(key, this._sourceFile);
 				let valClassDecl = <ts.ClassDeclaration> val.origNode;
 				let valClassName = transformUtils.getClassNameFromClassDeclaration(valClassDecl, this._sourceFile);
-				if (keyClassName === valClassName) {
+				if (keyClassName === valClassName && keyClassName === className) {
 					existingClass = val;
 				}
 			}
