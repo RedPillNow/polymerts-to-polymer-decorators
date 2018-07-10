@@ -611,37 +611,6 @@ export function getClassNameFromClassDeclaration(classDecl: ts.ClassDeclaration,
 	return className;
 }
 /**
- * Loop through the members of classDecl, if a node is in nodeMap then add it to the new members
- * instead of the existing node. Otherwise add the existing node
- * @param classDecl {ts.ClassDeclaration}
- * @param nodeMap {Map<ts.Node, TransformChangeRecord>}
- * @param sf {ts.SourceFile}
- * @return {ts.ClassElement[]}
- */
-export function updateClassMembers(classDecl: ts.ClassDeclaration, nodeMap: Map<ts.Node, TransformChangeRecord>, sf: ts.SourceFile): ts.ClassElement[] {
-	let newMembers = [];
-	if (classDecl && nodeMap) {
-		let members = classDecl.members;
-		for (let i = 0; i < members.length; i++) {
-			let member: ts.Node = members[i];
-			let chgRec = nodeMap.get(member);
-			if (chgRec && chgRec.newNode) {
-				let newNode = chgRec.newNode;
-				if (ts.isClassElement(newNode)) {
-					// console.log('Adding ' + ts.SyntaxKind[newNode.kind] + ' to newMembers');
-					newMembers.push(chgRec.newNode);
-				}else {
-					console.log('Node ' + ts.SyntaxKind[newNode.kind] + ' not a class element')
-				}
-			}else {
-				// console.log('Adding original ' + ts.SyntaxKind[member.kind] + ' to newMembers');
-				newMembers.push(member);
-			}
-		}
-	}
-	return newMembers;
-}
-/**
  * Get the SINGLE heritage clause (i.e. `extends SomeOther.Element`). If the changeComponentClassExtension option
  * is true, then replace what the class extends with `Polymer.Element`
  * @param classDecl {ts.ClassDeclaration}
@@ -724,4 +693,44 @@ export function addBehaviorToHeritage(heritageCl: ts.HeritageClause, rpBehavior:
 		);
 	}
 	return newHeritage;
+}
+/**
+ * Create a ready method
+ * @param sf {ts.SourceFile}
+ * @return {ts.MethodDeclaration}
+ */
+export function createReadyMethod(): ts.MethodDeclaration {
+	return ts.createMethod(
+		/* ts.Decorator[] */ undefined,
+		/* ts.Modifier[] */ undefined,
+		/* ts.AsteriskToken */ undefined,
+		/* name */ 'ready',
+		/* ts.QuestionToken */ undefined,
+		/* ts.TypeParameterDeclaration */ undefined,
+		/* ts.ParameterDeclaration[] */ undefined,
+		/* ts.TypeNode */ undefined,
+		/* ts.Block */ ts.createBlock([], true)
+	)
+}
+
+export function createReadyListener(rpListener: RedPill.Listener, sf: ts.SourceFile): ts.Node {
+	let statement = null;
+	if (rpListener) {
+		let propAcc = ts.createPropertyAccess(
+			/* ts.Expression */ ts.createIdentifier(rpListener.elementId || 'document'),
+			/* string */ 'addEventListener'
+		);
+		let callArgs = [];
+		callArgs.push(ts.createStringLiteral(rpListener.eventName));
+		callArgs.push(ts.createPropertyAccess(ts.createThis(), rpListener.method.methodName));
+		let call = ts.createCall(
+			/* ts.Expression */ propAcc,
+			/* ts.TypeNode[] */ undefined,
+			/* ts.Expression[] args */ callArgs
+		);
+		statement = ts.createStatement(
+			/* ts.Expression */ call
+		);
+	}
+	return statement;
 }

@@ -20,8 +20,8 @@ It was also decided that this tool should support more than just a conversion to
 
 We make a few assumptions while transforming PolymerTS files to use polymer-decorators. These are listed below:
 
-* Declared Properties are defined before all other types of decorated items (i.e. Observer, Listener, Computed)
-* If there is a `ready` function, it is defined before all listener decorated items
+* Declared Properties are defined before all other types of decorated items (i.e. `Observer`, `Listener`, `Computed`)
+* If there is a `ready` function, it is defined **before** all `listener` decorated items
 
 ##  Current Limitations
 
@@ -32,8 +32,6 @@ We make a few assumptions while transforming PolymerTS files to use polymer-deco
 	* References to the arguments defined in the original PolymerTs method body are not updated with the `this` keyword
 * Listener
 	* If an element ID is not defined in the PolymerTs listener, we're currently adding `document` as the target. Should be `this`?
-	* If `applyDeclarativeEventListeners` and/or `applyGestureEventListeners` is set to `false`. We are not updating the `ready` function
-	* If `applyDeclarativeEventListeners` and/or `applyGestureEventListeners` is set to `false` and a `ready` is not defined, we are not currently creating the `ready` function with the event listeners in it
 * Polymer 2.0 Deprecated methods and elements
 	* We don't currently change these to the Polymer 2.0 supported pattern(s)
 
