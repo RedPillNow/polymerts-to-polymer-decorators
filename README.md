@@ -72,7 +72,7 @@ The following options are available to configure how to Transform your source fi
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 |changeInline|boolean|false|Set to true to overwrite the original source file|
-|outputPath|string|./polymerTsToPolymerDecoratorsOutput/|The path where you want the converted files placed|
+|outputPath|string|./polymerTsConvert/|The path where you want the converted files placed|
 |useMetadataReflection|boolean|false|Set to true to use the Metadata Reflection API|
 |conversionType|string|polymer-decorators|Currently not used|
 |targetPolymerVersion|number|2|The target version of Polymer to convert your source files to. Currently only version 2 is supported|

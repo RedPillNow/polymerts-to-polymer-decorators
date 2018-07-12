@@ -99,7 +99,7 @@ function _updateOutputPath() {
 function _setOptions(opts): ConverterOptions {
 	let defaultOpts: ConverterOptions = {
 		changeInline: false,
-		outputPath: './polymerTsToPolymerDecoratorsOutput/',
+		outputPath: './polymerTsConvert/',
 		useMetadataReflection: false,
 		conversionType: 'polymer-decorators',
 		targetPolymerVersion: 2,
