@@ -1,7 +1,7 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as ts from 'typescript';
-import {PolymerTsTransformer, PolymerTsTransformerFactory} from './utils/transformer';
+import {PolymerTsTransformerFactory} from './utils/transformer';
 import * as glob from 'glob';
 import * as rimraf from 'rimraf';
 import * as chalk from './utils/chalkConfig';
@@ -12,11 +12,12 @@ let _procFiles: string[] = [];
 let _generatedFiles: Map<ts.SourceFile, ts.SourceFile> = new Map();
 
 /**
- * This will update the source files to Polymer 2.0, we need to include Polymer 3.0
+ * This will update the source files to Polymer 2.0
  * @param pathGlob - A glob of file paths
  * @param options - The options for transformation
+ * @todo  we need to include Polymer 3.0
  */
-export default function updateSource(pathGlob: string | string[], options?: any) {
+export default function transformPolymerTs(pathGlob: string | string[], options?: any) {
 	console.log(chalk.success('Starting transformation of components...'));
 	const opts = options ? _setOptions(options) : _options;
 	_options = opts;
@@ -140,22 +141,18 @@ function _getFileArray(pathGlob) {
 	return procFiles;
 }
 
-// For dev purposes only. MUST be removed before deployment/release
-
-// getComponents('src/data/**/*.ts', {
-// 	outputPath: './docs/',
-// 	glob: {
-// 		ignore: ['**/bower_components/**/*.*', 'src/data/app/dig/**/*.*']
-// 	}
-// });
+/**
+ * For dev purposes only. MUST be removed before deployment/release
+ * @ignore
+ * @hidden
+ */
 let files = [
-	'src/data/app/elements/dig-person-avatar/*.ts',
+	// 'src/data/app/elements/dig-person-avatar/*.ts',
 	// 'src/data/app/elements/dig-app-site/*.ts',
-	// 'src/data/app/elements/dig-app/*.ts',
+	'src/data/app/elements/dig-app/*.ts',
 	// 'src/data/app/elements/dig-animated-pages-behavior/*.ts',
 	// 'src/data/app/elements/**/*.ts',
 	// 'src/data/app/elements/dig-card-drawer/dig-card-drawer.ts'
 ];
-// getComponents(files, {outputPath: './docs/'});
-updateSource(files, {outputPath: './docs/'});
+transformPolymerTs(files, {outputPath: './docs/'});
 

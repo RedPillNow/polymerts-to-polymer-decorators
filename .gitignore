@@ -1,7 +1,6 @@
 node_modules
 .vscode
 src/data/
-src/docs/
 src/**/*.js
 src/**/*.map
 dist/

@@ -144,7 +144,7 @@ export class PolymerTsTransformer {
 	/**
 	 * Use the visitor pattern to walk each node. If that node has a polymerTS decorator, make the necessary
 	 * changes to the node to match the polymer-decorators pattern. This will create a TransformChangeRecord
-	 * that will subsequently be placed in the _transformNodeMap
+	 * that will subsequently be placed in the {@link transformNodeMap}
 	 * @param ctx
 	 * @param sf
 	 * @see {TransformChangeRecord}
@@ -213,7 +213,7 @@ export class PolymerTsTransformer {
 		}
 	}
 	/**
-	 * Use the visitor pattern to walk each node, if that node is in the transformNodeMap and it has a newNode
+	 * Use the visitor pattern to walk each node, if that node is in the {@link transformNodeMap} and it has a newNode
 	 * defined, then return that newNode
 	 * @param ctx {ts.TransformationContext}
 	 * @returns {tx.Transformer<ts.SourceFile>}
@@ -270,7 +270,7 @@ export class PolymerTsTransformer {
 	transformClassDecl(classDecl: ts.ClassDeclaration): TransformChangeRecord {
 		let chgRec: TransformChangeRecord = null;
 		if (classDecl && ts.isClassDeclaration(classDecl)) {
-			let newDecorator: ts.Decorator = this.renameDecorator(classDecl, transformUtils.polymerTsRegEx.component, 'customElement', this._sourceFile);
+			let newDecorator: ts.Decorator = this.renameDecorator(classDecl, transformUtils.polymerTsRegEx.component, 'customElement');
 			if (newDecorator) {
 				let notify: Notification = {
 					type: NotificationType.INFO,
@@ -360,33 +360,38 @@ export class PolymerTsTransformer {
 			let newDecorators: ts.Decorator[] = [];
 			if (decorator) {
 				if (transformUtils.decoratorHasObjectArgument(decorator)) { // @computed({type: String})
-					let callExp: ts.CallExpression = <ts.CallExpression> decorator.expression;
-					let objLitExp: ts.ObjectLiteralExpression = <ts.ObjectLiteralExpression> callExp.arguments[0];
-					let newCallExp: ts.CallExpression = ts.createCall(
+					const callExp: ts.CallExpression = <ts.CallExpression> decorator.expression;
+					let objLit: ts.ObjectLiteralExpression = <ts.ObjectLiteralExpression> callExp.arguments[0];
+					const hasValueProp: boolean = transformUtils.getObjectLiteralPropertyExpression(objLit, 'value', this._sourceFile) ? true : false;
+					if (hasValueProp) {
+						objLit = transformUtils.removePropertyFromObjectLiteral(objLit, 'value', this._sourceFile);
+					}
+					const newCallExp: ts.CallExpression = ts.createCall(
 						/* ts.Expression */ ts.createIdentifier('property'),
 						/* ts.TypeNode */ undefined,
-						/* args ts.Expression[] */ [objLitExp]
+						/* args ts.Expression[] */ [objLit]
 					);
-					let newPropertyDecorator: ts.Decorator = ts.createDecorator(
+					const newPropertyDecorator: ts.Decorator = ts.createDecorator(
 						/* ts.Expression */ newCallExp
 					);
 					newDecorators.push(newPropertyDecorator);
 					notify.msg += ' Added a property decorator';
 				}
-				let newArgs: ts.StringLiteral[] = transformUtils.getArgsFromNode(methodDecl, this._sourceFile);
-				let updatedDecorator = this.updateDecorator(decorator, 'computed', newArgs, this._sourceFile);
+				const newArgs: ts.StringLiteral[] = transformUtils.getArgsFromNode(methodDecl, this._sourceFile);
+				const updatedDecorator = this.updateDecorator(decorator, 'computed', newArgs);
 				newDecorators.push(updatedDecorator);
-				let propertyName: ts.Identifier = <ts.Identifier> methodDecl.name;
+				const propertyName: ts.Identifier = <ts.Identifier> methodDecl.name;
 				// TODO: Need to parse the body looking for property names and change them to use `this.propertyName`
-				let newGetter: ts.GetAccessorDeclaration = ts.createGetAccessor(
+				let newBody = this.addThisToBodyStatements(methodDecl, newArgs);
+				const newGetter: ts.GetAccessorDeclaration = ts.createGetAccessor(
 					/* ts.Decorator[] */ newDecorators,
 					/* ts.Modifier[] */ undefined,
 					/* ts.Identifier|ts.StringLiteral */ propertyName,
 					/* ts.ParameterDeclaration[] */ undefined,
 					/* ts.TypeNode */ undefined,
-					/* ts.Block */ methodDecl.body
+					/* ts.Block */ newBody
 				);
-				let replaceMeth: TransformChangeRecord = {
+				const replaceMeth: TransformChangeRecord = {
 					changeType: TransformChangeType.MethodReplace,
 					origNode: methodDecl,
 					newNode: newGetter,
@@ -420,7 +425,7 @@ export class PolymerTsTransformer {
 					}else {
 						params.push(ts.createStringLiteral(rpListener.elementId));
 					}
-					let newDecorator: ts.Decorator = this.updateDecorator(decorator, 'listen', params, this._sourceFile);
+					let newDecorator: ts.Decorator = this.updateDecorator(decorator, 'listen', params);
 					let newMethod = ts.updateMethod(
 						methodDecl,
 						[newDecorator],
@@ -525,7 +530,7 @@ export class PolymerTsTransformer {
 					if (existPropChgRec) {
 						let existingProp = existPropChgRec.newNode ? <ts.PropertyDeclaration> existPropChgRec.newNode : <ts.PropertyDeclaration> existPropChgRec.origNode;
 						if (existingProp) {
-							existingProp = this.addPropertyToPropertyDecl(existingProp, 'observer', methodName, this._sourceFile);
+							existingProp = this.addPropertyToPropertyDecl(existingProp, 'observer', methodName);
 							existPropChgRec.newNode = existingProp;
 							this._transformNodeMap.set(existPropChgRec.origNode, existPropChgRec);
 							notify = {
@@ -545,7 +550,7 @@ export class PolymerTsTransformer {
 						let param: ts.StringLiteral = ts.createStringLiteral(rpObserver.params[i])
 						params.push(param);
 					}
-					let newDecorator: ts.Decorator = this.updateDecorator(decorator, 'observe', params, this._sourceFile);
+					let newDecorator: ts.Decorator = this.updateDecorator(decorator, 'observe', params);
 					newDecorators.push(newDecorator);
 					notify = {
 						type: NotificationType.INFO,
@@ -577,7 +582,7 @@ export class PolymerTsTransformer {
 			let notify: Notification = null;
 			if (rpProp.containsValueArrayLiteral || rpProp.containsValueFunction || rpProp.containsValueObjectDeclaration || rpProp.containsValueBoolean || rpProp.containsValueStringLiteral || rpProp.containsValueNull || rpProp.containsValueUndefined) {
 				let valueInit = transformUtils.getPropertyValueExpression(propertyDecl, this._sourceFile);
-				let propDelValue = this.removePropertyFromPropertyDecl(propertyDecl, 'value', this._sourceFile);
+				let propDelValue = this.removePropertyFromPropertyDecl(propertyDecl, 'value');
 				let propWithInitializer = this.addInitializerToPropertyDecl(propDelValue, valueInit);
 				notify = {
 					type: NotificationType.INFO,
@@ -607,7 +612,7 @@ export class PolymerTsTransformer {
 		return chgRec;
 	}
 	/**
-	 * Loop through the members of classDecl, if a node is in nodeMap then add it to the new members
+	 * Loop through the members of classDecl, if a node is in {@link transformNodeMap} then add it to the new members
 	 * instead of the existing node. Otherwise add the existing node
 	 * @param classDecl {ts.ClassDeclaration}
 	 * @param nodeMap {Map<ts.Node, TransformChangeRecord>}
@@ -795,24 +800,21 @@ export class PolymerTsTransformer {
 	 * @param sf {ts.SourceFile}
 	 * @return {ts.PropertyDeclaration}
 	 */
-	removePropertyFromPropertyDecl(propDecl: ts.PropertyDeclaration, propertyName: string, sf: ts.SourceFile): ts.PropertyDeclaration {
+	removePropertyFromPropertyDecl(propDecl: ts.PropertyDeclaration, propertyName: string): ts.PropertyDeclaration {
 		let newProp = propDecl;
 		if (propDecl) {
-			let existingPropDec = transformUtils.getPolymerTsDecorator(propDecl, sf);
+			let existingPropDec = transformUtils.getPolymerTsDecorator(propDecl, this._sourceFile);
 			if (!existingPropDec) {
 				existingPropDec = propDecl.decorators[0];
 			}
-			let objLit = (<ts.ObjectLiteralExpression> (<ts.CallExpression> existingPropDec.expression).arguments[0])
-			let propProps = [];
-			for (let i = 0; i < objLit.properties.length; i++) {
-				let propProp: ts.ObjectLiteralElementLike = objLit.properties[i];
-				if (propProp.name.getText(sf) !== propertyName) {
-					propProps.push(propProp);
-				}
+			let objLit = (<ts.ObjectLiteralExpression> (<ts.CallExpression> existingPropDec.expression).arguments[0]);
+			let hasProperty: boolean = transformUtils.getObjectLiteralPropertyExpression(objLit, propertyName, this._sourceFile) ? true : false;
+			if (hasProperty) {
+				objLit = transformUtils.removePropertyFromObjectLiteral(objLit, propertyName, this._sourceFile);
 			}
 			let newObjLit = ts.updateObjectLiteral(
 				/* ts.ObjectLiteralExpression */ objLit,
-				/* ts.ObjectLiteralElementLike */ propProps
+				/* ts.ObjectLiteralElementLike */ objLit.properties
 			);
 			let newIdent = ts.createIdentifier('property');
 			let newArgs = [newObjLit];
@@ -842,7 +844,7 @@ export class PolymerTsTransformer {
 	 * @param sf {ts.SourceFile}
 	 * @return {ts.PropertyDeclaration}
 	 */
-	addPropertyToPropertyDecl(propDecl: ts.PropertyDeclaration, newPropName: string, newPropInitializer: string, sf: ts.SourceFile): ts.PropertyDeclaration {
+	addPropertyToPropertyDecl(propDecl: ts.PropertyDeclaration, newPropName: string, newPropInitializer: string): ts.PropertyDeclaration {
 		let updatedProp = null;
 		if (propDecl) {
 			let existingPropDec = propDecl.decorators[0];
@@ -897,11 +899,11 @@ export class PolymerTsTransformer {
 	 * @todo decorator name and params should be able to be null, then we just update the
 	 * CallExpression. This would negate renameDecorator
 	 */
-	updateDecorator(existingDecorator: ts.Decorator, decoratorName: string, params: ts.Expression[], sf: ts.SourceFile): ts.Decorator {
+	updateDecorator(existingDecorator: ts.Decorator, decoratorName: string, params: ts.Expression[]): ts.Decorator {
 		let newDecorator: ts.Decorator = null;
 		if (decoratorName && existingDecorator) {
 			const newIdent = ts.createIdentifier(decoratorName);
-			const newArgs: ts.StringLiteral[] = transformUtils.getArgsFromNode(existingDecorator, sf);
+			const newArgs: ts.StringLiteral[] = transformUtils.getArgsFromNode(existingDecorator, this._sourceFile);
 			let newCallExp = ts.createCall(
 				/* ts.Expression */ newIdent,
 				/* ts.TypeNode[] */ (<ts.CallExpression> existingDecorator.expression).typeArguments,
@@ -924,12 +926,12 @@ export class PolymerTsTransformer {
 	 * @todo instead of creating a new CallExpression, maybe we should update the
 	 * existing CallExpression
 	 */
-	renameDecorator(parentNode: ts.Node, polymerTsRegEx: RegExp, newDecoratorText: string, sf: ts.SourceFile): ts.Decorator {
+	renameDecorator(parentNode: ts.Node, polymerTsRegEx: RegExp, newDecoratorText: string): ts.Decorator {
 		let decorators = parentNode.decorators;
 		let newDecorator: ts.Decorator = null;
 		for (let i = 0; i < decorators.length; i++) {
 			let dec: ts.Decorator = <ts.Decorator> decorators[i];
-			let decText = dec.expression.getText(sf);
+			let decText = dec.expression.getText(this._sourceFile);
 			let decTextMatch = polymerTsRegEx.exec(decText);
 			if (decTextMatch && decTextMatch.length > 0) {
 				let args = (<ts.CallExpression> dec.expression).arguments;
@@ -965,6 +967,59 @@ export class PolymerTsTransformer {
 			methodDecl.type,
 			methodDecl.body
 		);
+	}
+	/**
+	 * Take the body of a MethodDeclaration, parse the statements looking for references to anything in
+	 * oldArgs and transform the identifier from `someArg` to `this.someArg` PropertyAccessExpression
+	 * @param methodDecl {ts.MethodDeclaration}
+	 * @param oldArgs {ts.StringLiteral[]}
+	 * @return {ts.Block}
+	 */
+	addThisToBodyStatements(methodDecl: ts.MethodDeclaration, oldArgs: ts.StringLiteral[]): ts.Block {
+		let newBody: ts.Block = methodDecl.body;
+		if (methodDecl && ts.isMethodDeclaration(methodDecl) && methodDecl.body) {
+			let statements = [].concat(methodDecl.body.statements);
+			let argStrs: string[] = [];
+			for (let i = 0; i < oldArgs.length; i++) {
+				let argStrLit = oldArgs[i];
+				let argStr = argStrLit.text;
+				argStrs.push(argStr);
+			}
+			let lastNodeWasThis = false;
+			let parseKids = (node: ts.Node) => {
+				node = ts.visitEachChild(node, parseKids, this.ctx);
+				if (ts.isIdentifier(node)) {
+					let ident = <ts.Identifier> node;
+					let identText = ident.text;
+					if (argStrs.indexOf(identText) > -1 && !lastNodeWasThis) {
+						let newPropAcc = ts.createPropertyAccess(
+							ts.createThis(),
+							identText
+						);
+						lastNodeWasThis = false;
+						return newPropAcc;
+					}else {
+						lastNodeWasThis = false;
+						return node;
+					}
+				}else if (node.kind === ts.SyntaxKind.ThisKeyword) {
+					lastNodeWasThis = true;
+					return node;
+				}
+				lastNodeWasThis = false;
+				return node;
+			}
+			let newStmts = [];
+			for (let i = 0; i < statements.length; i++) {
+				let workingStmt = statements[i];
+				newStmts.push(ts.visitNode(workingStmt, parseKids));
+			}
+			newBody = ts.updateBlock(
+				methodDecl.body,
+				newStmts
+			);
+		}
+		return newBody;
 	}
 	/**
 	 * Locate an already processed declared property in the _transformNodeMap

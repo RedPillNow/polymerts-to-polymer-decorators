@@ -68,16 +68,51 @@ export function getPropertyValueExpression(propDecl: ts.PropertyDeclaration, sf:
 			existingPropDec = propDecl.decorators[0];
 		}
 		let objLit = (<ts.ObjectLiteralExpression> (<ts.CallExpression> existingPropDec.expression).arguments[0])
+		valueExp = getObjectLiteralPropertyExpression(objLit, 'value', sf);
+	}
+	return valueExp;
+}
+/**
+ * Get the intializer of a PropertyAssignment based on the propName
+ * @param objLit {ts.ObjectLiteralExpression}
+ * @param propName {string}
+ * @param sf {ts.SourceFile}
+ */
+export function getObjectLiteralPropertyExpression(objLit: ts.ObjectLiteralExpression, propName: string, sf: ts.SourceFile): ts.Expression {
+	if (objLit && ts.isObjectLiteralExpression(objLit) && objLit.properties) {
 		for (let i = 0; i < objLit.properties.length; i++) {
-			let propProp: ts.ObjectLiteralElementLike = objLit.properties[i];
-			if (propProp.name.getText(sf) === 'value' && ts.isPropertyAssignment(propProp)) {
-				let propPropAssign: ts.PropertyAssignment = <ts.PropertyAssignment> propProp;
-				valueExp = propPropAssign.initializer;
+			let prop: ts.ObjectLiteralElementLike = objLit.properties[i];
+			if (prop.name.getText(sf) === propName && ts.isPropertyAssignment(prop)) {
+				let propAssign: ts.PropertyAssignment = <ts.PropertyAssignment> prop;
+				return propAssign.initializer;
+			}
+		}
+	}
+	return null;
+}
+/**
+ * Remove a property from an Object Literal Expression
+ * @param objLit {ts.ObjectLiteralExpression}
+ * @param propName {string}
+ * @param sf {ts.SourceFile}
+ */
+export function removePropertyFromObjectLiteral(objLit: ts.ObjectLiteralExpression, propName: string, sf: ts.SourceFile): ts.ObjectLiteralExpression {
+	let newObjLit = objLit;
+	if (objLit && ts.isObjectLiteralExpression(objLit) && objLit.properties) {
+		let props = [].concat(objLit.properties);
+		for (let i = 0; i < props.length; i++) {
+			let prop: ts.ObjectLiteralElementLike = objLit.properties[i];
+			if (prop.name.getText(sf) === propName && ts.isPropertyAssignment(prop)) {
+				props.splice(i, 1);
+				newObjLit = ts.updateObjectLiteral(
+					newObjLit,
+					props
+				);
 				break;
 			}
 		}
 	}
-	return valueExp;
+	return newObjLit;
 }
 /**
  * Get a list of behaviors from the ClassDeclaration. PolymerTS defines these as behavior decorators

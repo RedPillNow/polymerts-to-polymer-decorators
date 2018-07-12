@@ -6,7 +6,8 @@
 	"scripts": {
 		"compile": "tsc",
 		"build": "tsc --outDir ./",
-		"test": "echo \"Error: no test specified\" && exit 1"
+		"test": "echo \"Error: no test specified\" && exit 1",
+		"docs": "typedoc --out ./doc/ --exclude \"**/src/data/**/*.*\" ./src/"
 	},
 	"keywords": [
 		"polymerts",
@@ -27,22 +28,12 @@
 	},
 	"license": "Apache-2.0",
 	"devDependencies": {
-		"@types/node": "^9.4.5",
-		"del": "^3.0.0",
-		"gulp": "^3.9.1",
-		"gulp-bump": "^3.1.0",
-		"gulp-color": "0.0.1",
-		"gulp-ignore": "^2.0.2",
-		"gulp-sourcemaps": "^2.6.4",
-		"gulp-typescript": "^4.0.1",
-		"merge-stream": "^1.0.1"
+		"@types/node": "^9.4.5"
 	},
 	"dependencies": {
 		"chalk": "^2.4.1",
 		"glob": "^7.1.2",
-		"htmlparser2": "^3.9.2",
 		"polymerts-models": "file:../polymer-typescript-models",
-		"replace-in-file": "^3.4.0",
 		"rimraf": "^2.6.2",
 		"typescript": "^2.9.2"
 	}

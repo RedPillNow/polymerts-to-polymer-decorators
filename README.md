@@ -6,9 +6,7 @@ This project is a tool to convert a [PolymerTS](https://github.com/nippur72/Poly
 
 ## Installation
 
-```cli
-npm install --save-dev git+https://github.com/RedPillNow/polymerts-to-polymer-decorators.git
-```
+`npm install --save-dev git+https://github.com/RedPillNow/polymerts-to-polymer-decorators.git`
 
 ## Overview
 
@@ -21,21 +19,24 @@ It was also decided that this tool should support more than just a conversion to
 We make a few assumptions while transforming PolymerTS files to use polymer-decorators. These are listed below:
 
 * Declared Properties are defined before all other types of decorated items (i.e. `Observer`, `Listener`, `Computed`)
-* If there is a `ready` function, it is defined **before** all `listener` decorated items
+* **If** there is a `ready` function, it is defined **before** all `listener` decorated items
 
 ##  Current Limitations
 
 **_This project is still in active development_**. As such there are certain limitations which will eventually be addressed:
 
+* Class Declaration
+	* If a PolymerTs class implements interfaces, those implementations are currently lost
 * Behavior
 	* Behaviors are NOT transformed to a Mixin
-* Computed Property
-	* If your computed property decorator has an object inside it and that object has a `value` key, it will not be removed and may not function properly
-	* References to the arguments defined in the original PolymerTs method body are not updated with the `this` keyword
-* Listener
-	* If an element ID is not defined in the PolymerTs listener, we're currently adding `document` as the target. Should be `this`?
-* Polymer 2.0 Deprecated methods and elements
+* @Listener
+	* If an element ID is not defined in the PolymerTs listener, we're currently adding `document` as the target. Should be `this` if a gesture event?
+* Polymer 1.0 Deprecated methods, properties and elements
 	* We don't currently change these to the Polymer 2.0 supported pattern(s)
+
+## Documentation
+
+Documentation is included in the `doc` directory. This documentation is generated with [TypeDoc](http://typedoc.org/)
 
 ## Usage
 
@@ -43,7 +44,7 @@ We make a few assumptions while transforming PolymerTS files to use polymer-deco
 
 ```js
 const toPolymerDecorators = require('polymerts-to-polymer-decorators');
-toPolymerDecorators.convertToPolymerDecorators('src/**/*.ts', null);
+toPolymerDecorators.transformPolymerTs('src/**/*.ts', null);
 ```
 
 ### Usage with Options
@@ -61,7 +62,7 @@ let options = {
 		]
 	}
 }
-toPolymerDecorators.convertToPolymerDecorators('src/**/*.ts', options);
+toPolymerDecorators.transformPolymerTs('src/**/*.ts', options);
 ```
 
 ## Options
@@ -80,9 +81,23 @@ The following options are available to configure how to Transform your source fi
 |applyGestureEventListenersMixin|boolean|false|If true will add the GestureEventListenersMixin to the class|
 |pathToBowerComponents|string|../../bower_components|Path to the bower_components directory|
 |changeComponentClassExtension|boolean|false|If true and the component class doesn't extend `Polymer.Element` the extension class will be replaced with `Polymer.Element`|
-|glob|object|{ignore:['bower_components/**/*.*','node_modules/**/*.*']|Files we should ignore|
-|compiler|object|{stripInternal:true,target:ts.ScriptTarget.ES5,experimentalDecorators:true,listEmittedFiles:true}|TypeScript Compiler options|
+|glob|object|{<br />ignore:[<br />'bower_components/**/*.*',<br />'node_modules/**/*.*'<br />]<br />}|Files we should ignore|
+|compiler|object|{<br />stripInternal:true,<br />target:ts.ScriptTarget.ES5,<br />experimentalDecorators:true,<br />listEmittedFiles:true<br />}|TypeScript Compiler options|
+
+## NPM Scripts
+
+The following NPM scripts are available:
+
+* `compile` - Run the TypeScript compiler
+* `build` - Will build the source and make ready for distribution
+* `docs` - Will generate the [TypeDoc](http://typedoc.org/) documententation
+
+## Projects of Interest
+
+* [polymerts-models](https://github.com/RedPillNow/polymerts-models)
+* [PolymerTS](https://github.com/nippur72/PolymerTS)
+* [polymer-decorators](https://github.com/Polymer/polymer-decorators#observetargets-string)
 
 ## Contributing
 
-Fork it and issue a Pull request
+[Fork](https://help.github.com/articles/fork-a-repo/) it and issue a [Pull](https://github.com/RedPillNow/polymerts-to-polymer-decorators/pulls) request
