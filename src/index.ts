@@ -21,6 +21,8 @@ export default function updateSource(pathGlob: string | string[], options?: any)
 	const opts = options ? _setOptions(options) : _options;
 	_options = opts;
 	const compilerOpts = _options.compiler;
+	let filesNotWritten = [];
+	let filesWritten = [];
 	if (_options.outputPath) {
 		console.log(chalk.success('Output files will be placed in: ' + _options.outputPath));
 		_updateOutputPath();
@@ -40,11 +42,28 @@ export default function updateSource(pathGlob: string | string[], options?: any)
 		const newSourceFile: ts.SourceFile = result.transformed[0];
 		_generatedFiles.set(sourceFile, newSourceFile);
 		const printer: ts.Printer = ts.createPrinter({newLine: ts.NewLineKind.LineFeed});
-		const outputText: string = printer.printFile(newSourceFile);
-		const notifications = transformerFactory.transformer.notifications;
-		const transformChgMaps = transformerFactory.transformer.transformNodeMap;
-		console.log('done compilng' + file);
-		_writeSourceFile(file, outputText);
+		let outputText = null;
+		try {
+			outputText = printer.printFile(newSourceFile);
+		}catch (e) {
+			console.log(chalk.error(e));
+		}
+		if (outputText) {
+			const notifications = transformerFactory.transformer.notifications;
+			const transformChgMaps = transformerFactory.transformer.transformNodeMap;
+			_writeSourceFile(file, outputText);
+			console.log(chalk.success('*****File ' + file + ' successfully written*****\n'));
+			filesWritten.push(file);
+		}else {
+			console.log(chalk.warning('*****File ' + file + ' NOT written due to errors!*****\n'));
+			filesNotWritten.push(file);
+		}
+	}
+	if (filesWritten.length > 0) {
+		console.log(chalk.success('The following files were successfully written:\n' + filesWritten + '\n\n'));
+	}
+	if (filesNotWritten.length > 0) {
+		console.log(chalk.warning('The following files were NOT written due to errors:\n' + filesNotWritten));
 	}
 }
 /**
@@ -130,10 +149,12 @@ function _getFileArray(pathGlob) {
 // 	}
 // });
 let files = [
-	// 'src/data/app/elements/dig-person-avatar/*.ts',
+	'src/data/app/elements/dig-person-avatar/*.ts',
 	// 'src/data/app/elements/dig-app-site/*.ts',
-	'src/data/app/elements/dig-app/*.ts',
-	// 'src/data/app/elements/dig-animated-pages-behavior/*.ts'
+	// 'src/data/app/elements/dig-app/*.ts',
+	// 'src/data/app/elements/dig-animated-pages-behavior/*.ts',
+	// 'src/data/app/elements/**/*.ts',
+	// 'src/data/app/elements/dig-card-drawer/dig-card-drawer.ts'
 ];
 // getComponents(files, {outputPath: './docs/'});
 updateSource(files, {outputPath: './docs/'});

@@ -27,7 +27,9 @@ We make a few assumptions while transforming PolymerTS files to use polymer-deco
 
 **_This project is still in active development_**. As such there are certain limitations which will eventually be addressed:
 
-* Computed Property:
+* Behavior
+	* Behaviors are NOT transformed to a Mixin
+* Computed Property
 	* If your computed property decorator has an object inside it and that object has a `value` key, it will not be removed and may not function properly
 	* References to the arguments defined in the original PolymerTs method body are not updated with the `this` keyword
 * Listener

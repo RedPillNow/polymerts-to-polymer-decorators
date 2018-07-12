@@ -227,7 +227,7 @@ export class PolymerTsTransformer {
 			if (ts.isClassDeclaration(node) && !transformChgRec) {
 				let classDecl = <ts.ClassDeclaration> node;
 				if (RedPill.isComponent(classDecl, this._sourceFile)) {
-					console.log(chalk.processing('*******Looking for a class named ' + classDecl.name.getText(this._sourceFile) + '*******'));
+					// console.log(chalk.processing('*******Looking for a class named ' + classDecl.name.getText(this._sourceFile) + '*******'));
 					let className = transformUtils.getClassNameFromClassDeclaration(classDecl, this._sourceFile);
 					transformChgRec = this._findExistingClassDeclaration(className);
 					if (!transformChgRec) {
@@ -262,14 +262,15 @@ export class PolymerTsTransformer {
 		}
 	}
 	/**
-	 * Transform the class declaration statement
+	 * Transform the class declaration statement. Luckily the ts compiler is smart enough
+	 * to process this last
 	 * @param classDecl {ts.ClassDeclaration}
 	 * @return {TransformChangeRecord}
 	 */
 	transformClassDecl(classDecl: ts.ClassDeclaration): TransformChangeRecord {
 		let chgRec: TransformChangeRecord = null;
 		if (classDecl && ts.isClassDeclaration(classDecl)) {
-			let newDecorator: ts.Decorator = transformUtils.renameDecorator(classDecl, transformUtils.polymerTsRegEx.component, 'customElement', this._sourceFile);
+			let newDecorator: ts.Decorator = this.renameDecorator(classDecl, transformUtils.polymerTsRegEx.component, 'customElement', this._sourceFile);
 			if (newDecorator) {
 				let notify: Notification = {
 					type: NotificationType.INFO,
@@ -292,9 +293,9 @@ export class PolymerTsTransformer {
 
 					for (let i = 0; i < behaviors.length; i++) {
 						if (i === 0 && !newHeritage) {
-							newHeritage = transformUtils.addBehaviorToHeritage(heritage, behaviors[i], this._sourceFile);
+							newHeritage = this.addBehaviorToHeritage(heritage, behaviors[i], this._sourceFile);
 						}else {
-							newHeritage = transformUtils.addBehaviorToHeritage(newHeritage, behaviors[i], this._sourceFile);
+							newHeritage = this.addBehaviorToHeritage(newHeritage, behaviors[i], this._sourceFile);
 						}
 						notify.msg += ' Added behavior ' + behaviors[i].name + '.';
 					}
@@ -308,14 +309,14 @@ export class PolymerTsTransformer {
 				if (this.options.applyGestureEventListenersMixin) {
 					let gestBehavior = new RedPill.IncludedBehavior();
 					gestBehavior.behaviorDeclarationString = 'Polymer.GestureEventListeners';
-					newHeritage = transformUtils.addBehaviorToHeritage(newHeritage, gestBehavior, this._sourceFile);
+					newHeritage = this.addBehaviorToHeritage(newHeritage, gestBehavior, this._sourceFile);
 					newHeritages = [newHeritage];
 					notify.msg += ' Added behavior Polymer.GestureEventListeners.';
 				}
 				if (this.options.applyDeclarativeEventListenersMixin) {
 					let declEvtBehavior = new RedPill.IncludedBehavior();
 					declEvtBehavior.behaviorDeclarationString = 'Polymer.DeclarativeEventListeners';
-					newHeritage = transformUtils.addBehaviorToHeritage(newHeritage, declEvtBehavior, this._sourceFile);
+					newHeritage = this.addBehaviorToHeritage(newHeritage, declEvtBehavior, this._sourceFile);
 					newHeritages = [newHeritage];
 					notify.msg += ' Added behavior Polymer.DeclarativeEventListeners.';
 				}
@@ -373,7 +374,7 @@ export class PolymerTsTransformer {
 					notify.msg += ' Added a property decorator';
 				}
 				let newArgs: ts.StringLiteral[] = transformUtils.getArgsFromNode(methodDecl, this._sourceFile);
-				let updatedDecorator = transformUtils.updateDecorator(decorator, 'computed', newArgs, this._sourceFile);
+				let updatedDecorator = this.updateDecorator(decorator, 'computed', newArgs, this._sourceFile);
 				newDecorators.push(updatedDecorator);
 				let propertyName: ts.Identifier = <ts.Identifier> methodDecl.name;
 				// TODO: Need to parse the body looking for property names and change them to use `this.propertyName`
@@ -419,7 +420,7 @@ export class PolymerTsTransformer {
 					}else {
 						params.push(ts.createStringLiteral(rpListener.elementId));
 					}
-					let newDecorator: ts.Decorator = transformUtils.updateDecorator(decorator, 'listen', params, this._sourceFile);
+					let newDecorator: ts.Decorator = this.updateDecorator(decorator, 'listen', params, this._sourceFile);
 					let newMethod = ts.updateMethod(
 						methodDecl,
 						[newDecorator],
@@ -474,7 +475,7 @@ export class PolymerTsTransformer {
 					let origReady = null;
 					let readyNotify: Notification = null;
 					if (!readyMethodChg) {
-						readyMethod = transformUtils.createReadyMethod();
+						readyMethod = this.createReadyMethod();
 						this._addReadyMethod = true;
 						origReady = readyMethod;
 						readyNotify = {
@@ -488,7 +489,7 @@ export class PolymerTsTransformer {
 						readyNotify.msg += 'Added listener to ready method.'
 					}
 					if (readyMethod) {
-						let statement = transformUtils.createReadyListener(rpListener, this._sourceFile);
+						let statement = this.createReadyListener(rpListener, this._sourceFile);
 						let readyChg = this.addListenerToReady(rpListener, readyMethod, origReady, statement);
 						readyChg.notification = readyNotify;
 						this._transformNodeMap.set(origReady, readyChg);
@@ -524,7 +525,7 @@ export class PolymerTsTransformer {
 					if (existPropChgRec) {
 						let existingProp = existPropChgRec.newNode ? <ts.PropertyDeclaration> existPropChgRec.newNode : <ts.PropertyDeclaration> existPropChgRec.origNode;
 						if (existingProp) {
-							existingProp = transformUtils.addPropertyToPropertyDecl(existingProp, 'observer', methodName, this._sourceFile);
+							existingProp = this.addPropertyToPropertyDecl(existingProp, 'observer', methodName, this._sourceFile);
 							existPropChgRec.newNode = existingProp;
 							this._transformNodeMap.set(existPropChgRec.origNode, existPropChgRec);
 							notify = {
@@ -544,14 +545,14 @@ export class PolymerTsTransformer {
 						let param: ts.StringLiteral = ts.createStringLiteral(rpObserver.params[i])
 						params.push(param);
 					}
-					let newDecorator: ts.Decorator = transformUtils.updateDecorator(decorator, 'observe', params, this._sourceFile);
+					let newDecorator: ts.Decorator = this.updateDecorator(decorator, 'observe', params, this._sourceFile);
 					newDecorators.push(newDecorator);
 					notify = {
 						type: NotificationType.INFO,
 						msg: 'Observer decorator method ' + rpObserver.methodName + ' updated'
 					}
 				}
-				let newMethod = transformUtils.updateMethodDecorator(methodDecl, newDecorators);
+				let newMethod = this.updateMethodDecorator(methodDecl, newDecorators);
 				chgRec = {
 					changeType: TransformChangeType.MethodModify,
 					origNode: methodDecl,
@@ -576,8 +577,8 @@ export class PolymerTsTransformer {
 			let notify: Notification = null;
 			if (rpProp.containsValueArrayLiteral || rpProp.containsValueFunction || rpProp.containsValueObjectDeclaration || rpProp.containsValueBoolean || rpProp.containsValueStringLiteral || rpProp.containsValueNull || rpProp.containsValueUndefined) {
 				let valueInit = transformUtils.getPropertyValueExpression(propertyDecl, this._sourceFile);
-				let propDelValue = transformUtils.removePropertyFromPropertyDecl(propertyDecl, 'value', this._sourceFile);
-				let propWithInitializer = transformUtils.addInitializerToPropertyDecl(propDelValue, valueInit);
+				let propDelValue = this.removePropertyFromPropertyDecl(propertyDecl, 'value', this._sourceFile);
+				let propWithInitializer = this.addInitializerToPropertyDecl(propDelValue, valueInit);
 				notify = {
 					type: NotificationType.INFO,
 					msg: 'Property ' + rpProp.name + ' has a value defined. Moved initializer to property instead of decorator'
@@ -653,7 +654,7 @@ export class PolymerTsTransformer {
 		let chgRec: TransformChangeRecord = null;
 		if (rpListener && readyMethodDecl && origReadyMethod && stmt) {
 			let newStmts = readyMethodDecl.body ? [].concat(readyMethodDecl.body.statements) : [];
-			newStmts.push(transformUtils.createReadyListener(rpListener, this._sourceFile));
+			newStmts.push(this.createReadyListener(rpListener, this._sourceFile));
 			let newBlock = readyMethodDecl.body ? ts.updateBlock(readyMethodDecl.body, newStmts) : ts.createBlock(newStmts, true);
 			let newReady = ts.updateMethod(
 				readyMethodDecl,
@@ -674,6 +675,296 @@ export class PolymerTsTransformer {
 			}
 		}
 		return chgRec;
+	}
+	/**
+	 * Create a ready method
+	 * @param sf {ts.SourceFile}
+	 * @return {ts.MethodDeclaration}
+	 */
+	createReadyMethod(): ts.MethodDeclaration {
+		return ts.createMethod(
+			/* ts.Decorator[] */ undefined,
+			/* ts.Modifier[] */ undefined,
+			/* ts.AsteriskToken */ undefined,
+			/* name */ 'ready',
+			/* ts.QuestionToken */ undefined,
+			/* ts.TypeParameterDeclaration */ undefined,
+			/* ts.ParameterDeclaration[] */ undefined,
+			/* ts.TypeNode */ undefined,
+			/* ts.Block */ ts.createBlock([], true)
+		)
+	}
+	/**
+	 * Create an event listener to place in the `ready` function
+	 * @param rpListener {RedPill.Listener}
+	 * @param sf {ts.SourceFile}
+	 * @return {ts.Node}
+	 */
+	createReadyListener(rpListener: RedPill.Listener, sf: ts.SourceFile): ts.Node {
+		let statement = null;
+		if (rpListener) {
+			let propAcc = ts.createPropertyAccess(
+				/* ts.Expression */ ts.createIdentifier(rpListener.elementId || 'document'),
+				/* string */ 'addEventListener'
+			);
+			let callArgs = [];
+			callArgs.push(ts.createStringLiteral(rpListener.eventName));
+			callArgs.push(ts.createPropertyAccess(ts.createThis(), rpListener.method.methodName));
+			let call = ts.createCall(
+				/* ts.Expression */ propAcc,
+				/* ts.TypeNode[] */ undefined,
+				/* ts.Expression[] args */ callArgs
+			);
+			statement = ts.createStatement(
+				/* ts.Expression */ call
+			);
+		}
+		return statement;
+	}
+	/**
+	 * Wrap the existing heritage clause in a mixin
+	 * @param heritageCl {ts.HeritageClause}
+	 * @param rpBehavior {string}
+	 * @param sf {ts.SourceFile}
+	 * @return {ts.HeritageClause}
+	 */
+	addBehaviorToHeritage(heritageCl: ts.HeritageClause, rpBehavior: RedPill.IncludedBehavior, sf: ts.SourceFile): ts.HeritageClause {
+		let newHeritage: ts.HeritageClause = heritageCl;
+		if (heritageCl && rpBehavior && heritageCl.types && heritageCl.types.length > 0) {
+			let types = heritageCl.types;
+			let type: ts.ExpressionWithTypeArguments = types[0];
+			let newTypes: ts.ExpressionWithTypeArguments[] = [];
+			if (ts.isIdentifier(type.expression) || ts.isPropertyAccessExpression(type.expression)) { // extends "someClass/some.class"
+				let newCall = ts.createCall(
+					/* ts.Expression */ rpBehavior.propertyAccessExpression,
+					/* ts.TypeNode[] */ undefined,
+					/* ts.Expression[] args */ [type.expression]
+				);
+				let newType = ts.updateExpressionWithTypeArguments(
+					/* ts.ExpressionWithTypeArgs */ type,
+					/* ts.TypeNode[] */ type.typeArguments,
+					/* ts.Expression */ newCall
+				);
+				newTypes.push(newType);
+			}else if (ts.isCallExpression(type.expression)) { // extends "someMixin(someOtherMixin/someClass)"
+				let newCall = ts.createCall(
+					/* ts.Expression */ rpBehavior.propertyAccessExpression,
+					/* ts.TypeNode[] */ undefined,
+					/* ts.Expression[] args */ [type.expression]
+				);
+				let newType = ts.updateExpressionWithTypeArguments(
+					/* ts.ExpressionWithTypeArgs */ type,
+					/* ts.TypeNode[] */ type.typeArguments,
+					/* ts.Expression */ newCall
+				);
+				newTypes.push(newType);
+			}
+
+			newHeritage = ts.updateHeritageClause(
+				/* ts.HeritageClause */ heritageCl,
+				/* ts.ExpressionWithTypeArguments[] */ newTypes
+			);
+		}
+		return newHeritage;
+	}
+	/**
+	 * Add an initializer to a property decorator
+	 * @param propDecl {ts.PropertyDeclaration}
+	 * @param initializer {ts.Expression}
+	 * @return {ts.PropertyDeclaration}
+	 */
+	addInitializerToPropertyDecl(propDecl: ts.PropertyDeclaration, initializer: ts.Expression): ts.PropertyDeclaration {
+		let newProp = propDecl;
+		if (propDecl) {
+			newProp = ts.updateProperty(
+				/* ts.PropertyDeclaration */ propDecl,
+				/* ts.Decorator[] */ propDecl.decorators,
+				/* ts.Modifier[] */ propDecl.modifiers,
+				/* ts.Identifier */ propDecl.name,
+				/* ts.QuestionToken */ propDecl.questionToken,
+				/* ts.typeNode */ propDecl.type,
+				/* ts.Expression init */ initializer
+			)
+		}
+		return newProp;
+	}
+	/**
+	 * Remove a property from a property decorator argument
+	 * @param propDecl {ts.PropertyDeclaration}
+	 * @param propertyName {string} the property name to remove
+	 * @param sf {ts.SourceFile}
+	 * @return {ts.PropertyDeclaration}
+	 */
+	removePropertyFromPropertyDecl(propDecl: ts.PropertyDeclaration, propertyName: string, sf: ts.SourceFile): ts.PropertyDeclaration {
+		let newProp = propDecl;
+		if (propDecl) {
+			let existingPropDec = transformUtils.getPolymerTsDecorator(propDecl, sf);
+			if (!existingPropDec) {
+				existingPropDec = propDecl.decorators[0];
+			}
+			let objLit = (<ts.ObjectLiteralExpression> (<ts.CallExpression> existingPropDec.expression).arguments[0])
+			let propProps = [];
+			for (let i = 0; i < objLit.properties.length; i++) {
+				let propProp: ts.ObjectLiteralElementLike = objLit.properties[i];
+				if (propProp.name.getText(sf) !== propertyName) {
+					propProps.push(propProp);
+				}
+			}
+			let newObjLit = ts.updateObjectLiteral(
+				/* ts.ObjectLiteralExpression */ objLit,
+				/* ts.ObjectLiteralElementLike */ propProps
+			);
+			let newIdent = ts.createIdentifier('property');
+			let newArgs = [newObjLit];
+			let newCallExp = ts.createCall(
+				newIdent,
+				undefined,
+				newArgs
+			);
+			let newDecorator = ts.createDecorator(newCallExp);
+			newProp = ts.updateProperty(
+				/* ts.PropertyDeclaration */ propDecl,
+				/* ts.Decorator[] */ [newDecorator],
+				/* ts.Modifier[] */ propDecl.modifiers,
+				/* string|ts.Identifier */ propDecl.name,
+				/* ts.Token<QuestionToken|ExclamationToken> */ propDecl.questionToken,
+				/* ts.TypeNode */ propDecl.type,
+				/* ts.Expression initializer */ propDecl.initializer
+			);
+		}
+		return newProp;
+	}
+	/**
+	 * Add a property to a property decorator argument
+	 * @param propDecl {ts.PropertyDeclaration} the property to update
+	 * @param newPropName {string} new name for a property
+	 * @param newPropInitializer {string} new property initialiazer
+	 * @param sf {ts.SourceFile}
+	 * @return {ts.PropertyDeclaration}
+	 */
+	addPropertyToPropertyDecl(propDecl: ts.PropertyDeclaration, newPropName: string, newPropInitializer: string, sf: ts.SourceFile): ts.PropertyDeclaration {
+		let updatedProp = null;
+		if (propDecl) {
+			let existingPropDec = propDecl.decorators[0];
+			/* if (!existingPropDec) {
+				existingPropDec = property.decorators[0];
+			} */
+			let objLit = (<ts.ObjectLiteralExpression> (<ts.CallExpression> existingPropDec.expression).arguments[0])
+			let propProps = [];
+			for (let i = 0; i < objLit.properties.length; i++) {
+				let propProp = objLit.properties[i];
+				propProps.push(propProp);
+			}
+			let newPropProp = ts.createPropertyAssignment(
+				/* string|ts.Identifier */ newPropName,
+				/* ts.Expression initializer */ ts.createStringLiteral(newPropInitializer)
+			);
+			propProps.push(newPropProp);
+
+			let newPropObj = ts.createObjectLiteral(
+				/* ts.ObjectLiteralElementLike properties */ propProps,
+				/* multiLine */ true
+			);
+
+			let newIdent = ts.createIdentifier('property');
+			let newArgs = [newPropObj];
+			let newCallExp = ts.createCall(
+				/* ts.Expression */ newIdent,
+				/* ts.TypeNode */ undefined,
+				/* ts.Expression[] args */ newArgs
+			);
+
+			let newDecorator = ts.createDecorator(newCallExp);
+			updatedProp = ts.updateProperty(
+				/* ts.PropertyDeclaration */ propDecl,
+				/* ts.Decorator[] */ [newDecorator],
+				/* ts.Modifier[] */ propDecl.modifiers,
+				/* string|ts.Identifier */ propDecl.name,
+				/* ts.Token<QuestionToken|ExclamationToken> */ propDecl.questionToken,
+				/* ts.TypeNode */ propDecl.type,
+				/* ts.Expression initializer */ propDecl.initializer
+			);
+		}
+		return updatedProp;
+	}
+	/**
+	 * Update a decorator with a new name and/or parameters
+	 * @param existingDecorator {ts.Decorator} decorator to update
+	 * @param decoratorName {string} new decorator name
+	 * @param params {ts.Expression[]} new parameters to add to the decorator
+	 * @param sf {ts.SourceFile}
+	 * @return {ts.Decorator}
+	 * @todo decorator name and params should be able to be null, then we just update the
+	 * CallExpression. This would negate renameDecorator
+	 */
+	updateDecorator(existingDecorator: ts.Decorator, decoratorName: string, params: ts.Expression[], sf: ts.SourceFile): ts.Decorator {
+		let newDecorator: ts.Decorator = null;
+		if (decoratorName && existingDecorator) {
+			const newIdent = ts.createIdentifier(decoratorName);
+			const newArgs: ts.StringLiteral[] = transformUtils.getArgsFromNode(existingDecorator, sf);
+			let newCallExp = ts.createCall(
+				/* ts.Expression */ newIdent,
+				/* ts.TypeNode[] */ (<ts.CallExpression> existingDecorator.expression).typeArguments,
+				/* ts.Expression[] */ params || newArgs
+			);
+			newDecorator = ts.updateDecorator(
+				/* ts.Decorator */ existingDecorator,
+				/* ts.CallExpression */ newCallExp
+			);
+		}
+		return newDecorator;
+	}
+	/**
+	 *
+	 * @param parentNode {ts.Node} decorator's parent node
+	 * @param polymerTsRegEx {RegExp}
+	 * @param newDecoratorText {string}
+	 * @param sf {ts.SourceFile}
+	 * @return ts.Decorator
+	 * @todo instead of creating a new CallExpression, maybe we should update the
+	 * existing CallExpression
+	 */
+	renameDecorator(parentNode: ts.Node, polymerTsRegEx: RegExp, newDecoratorText: string, sf: ts.SourceFile): ts.Decorator {
+		let decorators = parentNode.decorators;
+		let newDecorator: ts.Decorator = null;
+		for (let i = 0; i < decorators.length; i++) {
+			let dec: ts.Decorator = <ts.Decorator> decorators[i];
+			let decText = dec.expression.getText(sf);
+			let decTextMatch = polymerTsRegEx.exec(decText);
+			if (decTextMatch && decTextMatch.length > 0) {
+				let args = (<ts.CallExpression> dec.expression).arguments;
+				let newIdent: ts.Identifier = ts.createIdentifier(newDecoratorText);
+				let newCallExp: ts.CallExpression = ts.createCall(
+					newIdent,
+					undefined,
+					args
+				);
+				newDecorator = ts.updateDecorator(dec, newCallExp);
+				break;
+			}
+		}
+		return newDecorator;
+	}
+	/**
+	 * Update a MethodDeclaration with new decorators
+	 * @param methodDecl {ts.MethodDeclaration} the method to update
+	 * @param newDecorators {ts.Decorator[]} the new decorators to add
+	 * @return {ts.MethodDeclaration}
+	 * @todo this seems kind-of extremely simple... what does it save us?
+	 */
+	updateMethodDecorator(methodDecl: ts.MethodDeclaration, newDecorators: ts.Decorator[]): ts.MethodDeclaration {
+		return ts.updateMethod(
+			methodDecl,
+			newDecorators,
+			methodDecl.modifiers,
+			methodDecl.asteriskToken,
+			methodDecl.name,
+			methodDecl.questionToken,
+			methodDecl.typeParameters,
+			methodDecl.parameters,
+			methodDecl.type,
+			methodDecl.body
+		);
 	}
 	/**
 	 * Locate an already processed declared property in the _transformNodeMap
