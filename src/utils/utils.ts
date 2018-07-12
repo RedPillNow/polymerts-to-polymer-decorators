@@ -1,6 +1,6 @@
 import * as ts from 'typescript';
 import {RedPill} from 'polymerts-models';
-import {TransformChangeType, RefNodeCreateChangeRecord, PropertyOptions, TransformChangeRecord, ConverterOptions} from './custom-types';
+import {PropertyOptions, ConverterOptions} from './custom-types';
 
 /**
  * Collection of regular expressions to match PolymerTs Decorators
