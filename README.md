@@ -81,7 +81,7 @@ The following options are available to configure how to Transform your source fi
 |applyGestureEventListenersMixin|boolean|false|If true will add the GestureEventListenersMixin to the class|
 |pathToBowerComponents|string|../../bower_components|Path to the bower_components directory|
 |changeComponentClassExtension|boolean|false|If true and the component class doesn't extend `Polymer.Element` the extension class will be replaced with `Polymer.Element`|
-|glob|object|{<br />ignore:[<br />'bower_components/**/*.*',<br />'node_modules/**/*.*'<br />]<br />}|Files we should ignore|
+|glob|object|{<br />ignore:[<br />"bower_components/\*\*/\*.\*",<br />"node_modules/\*\*/\*.\*"<br />]<br />}|Files we should ignore|
 |compiler|object|{<br />stripInternal:true,<br />target:ts.ScriptTarget.ES5,<br />experimentalDecorators:true,<br />listEmittedFiles:true<br />}|TypeScript Compiler options|
 
 ## NPM Scripts

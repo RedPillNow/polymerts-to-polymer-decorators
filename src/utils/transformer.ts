@@ -1,7 +1,7 @@
 import * as ts from 'typescript';
 import * as chalk from './chalkConfig';
 import {RedPill} from 'polymerts-models';
-import {TransformChangeRecord, TransformChangeType, ConverterOptions, ListenerAddToReadyChangeRecord, NotificationType, Notification} from './custom-types';
+import {TransformChangeRecord, TransformChangeType, ConverterOptions, NotificationType, Notification} from './custom-types';
 import * as transformUtils from './utils';
 
 /**
