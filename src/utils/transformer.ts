@@ -280,9 +280,13 @@ export class PolymerTsTransformer {
 
 				let heritages: ts.HeritageClause[] = [].concat(classDecl.heritageClauses);
 				let newHeritages: ts.HeritageClause[] = [];
-				let heritage: ts.HeritageClause = heritages[0];
-				let newHeritage: ts.HeritageClause = heritage;
-				if (behaviors.length > 0) { // We have behaviors here
+				let heritage: ts.HeritageClause = null;
+				let newHeritage: ts.HeritageClause = null;
+				if (heritages && heritages.length > 0) {
+					heritage = heritages[0];
+					newHeritage = heritage;
+				}
+				if (heritage && behaviors.length > 0) { // We have behaviors here
 					if (!this.options.changeComponentClassExtension) {
 						newHeritages = heritages;
 					}else {
@@ -300,43 +304,50 @@ export class PolymerTsTransformer {
 						notify.msg += ' Added behavior ' + behaviors[i].name + '.';
 					}
 					newHeritages = [newHeritage];
-				}else if (!this.options.changeComponentClassExtension) {
+				}else if (heritage && !this.options.changeComponentClassExtension) {
 					newHeritages = heritages;
-				}else {
+				}else if (heritage) {
 					newHeritages = transformUtils.getClassHeritageExtendsPolymer(classDecl, this.options, this._sourceFile);
 					notify.msg += ' Changed extension point to Polymer.Element.';
 				}
-				if (this.options.applyGestureEventListenersMixin) {
-					let gestBehavior = new RedPill.IncludedBehavior();
-					gestBehavior.behaviorDeclarationString = 'Polymer.GestureEventListeners';
-					newHeritage = this.addBehaviorToHeritage(newHeritage, gestBehavior, this._sourceFile);
-					newHeritages = [newHeritage];
-					notify.msg += ' Added behavior Polymer.GestureEventListeners.';
+				if (heritages.length > 1) {
+					for (let i = 1; i < heritages.length; i++) {
+						newHeritages.push(heritages[i]);
+					}
 				}
-				if (this.options.applyDeclarativeEventListenersMixin) {
-					let declEvtBehavior = new RedPill.IncludedBehavior();
-					declEvtBehavior.behaviorDeclarationString = 'Polymer.DeclarativeEventListeners';
-					newHeritage = this.addBehaviorToHeritage(newHeritage, declEvtBehavior, this._sourceFile);
-					newHeritages = [newHeritage];
-					notify.msg += ' Added behavior Polymer.DeclarativeEventListeners.';
+				if (newHeritage && newHeritages) {
+					if (this.options.applyGestureEventListenersMixin) {
+						let gestBehavior = new RedPill.IncludedBehavior();
+						gestBehavior.behaviorDeclarationString = 'Polymer.GestureEventListeners';
+						newHeritage = this.addBehaviorToHeritage(newHeritage, gestBehavior, this._sourceFile);
+						newHeritages = [newHeritage];
+						notify.msg += ' Added behavior Polymer.GestureEventListeners.';
+					}
+					if (this.options.applyDeclarativeEventListenersMixin) {
+						let declEvtBehavior = new RedPill.IncludedBehavior();
+						declEvtBehavior.behaviorDeclarationString = 'Polymer.DeclarativeEventListeners';
+						newHeritage = this.addBehaviorToHeritage(newHeritage, declEvtBehavior, this._sourceFile);
+						newHeritages = [newHeritage];
+						notify.msg += ' Added behavior Polymer.DeclarativeEventListeners.';
+					}
+					let classMems = this.updateClassMembers(classDecl);
+					let newClassDecl = ts.updateClassDeclaration(
+						/* ts.ClassDeclaration */ classDecl,
+						/* ts.Decorator[] */ [newDecorator],
+						/* ts.Modifier[] */ classDecl.modifiers,
+						/* ts.Identifier */ classDecl.name,
+						/* ts.TypeParameterDeclaration */ classDecl.typeParameters,
+						/* ts.HeritageClause[] */ newHeritages,
+						/* ts.ClassElement[] */ classMems
+					);
+					chgRec = {
+						changeType: TransformChangeType.ClassModify,
+						origNode: classDecl,
+						newNode: newClassDecl,
+						notification: notify
+					};
+					this._notifications.push(notify);
 				}
-				let classMems = this.updateClassMembers(classDecl);
-				let newClassDecl = ts.updateClassDeclaration(
-					/* ts.ClassDeclaration */ classDecl,
-					/* ts.Decorator[] */ [newDecorator],
-					/* ts.Modifier[] */ classDecl.modifiers,
-					/* ts.Identifier */ classDecl.name,
-					/* ts.TypeParameterDeclaration */ classDecl.typeParameters,
-					/* ts.HeritageClause[] */ newHeritages,
-					/* ts.ClassElement[] */ classMems
-				);
-				chgRec = {
-					changeType: TransformChangeType.ClassModify,
-					origNode: classDecl,
-					newNode: newClassDecl,
-					notification: notify
-				};
-				this._notifications.push(notify);
 			}
 		}
 		return chgRec;
@@ -420,8 +431,10 @@ export class PolymerTsTransformer {
 					let params: ts.Expression[] = [];
 					params.push(rpListener.eventDeclaration);
 					let elementId = rpListener.elementId;
-					if (!elementId) {
+					if (!elementId && !rpListener.isGestureEvent) {
 						params.push(ts.createIdentifier('document'));
+					}else if (!elementId && rpListener.isGestureEvent) {
+						params.push(ts.createThis());
 					}else {
 						params.push(ts.createStringLiteral(rpListener.elementId));
 					}

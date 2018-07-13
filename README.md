@@ -25,12 +25,8 @@ We make a few assumptions while transforming PolymerTS files to use polymer-deco
 
 **_This project is still in active development_**. As such there are certain limitations which will eventually be addressed:
 
-* Class Declaration
-	* If a PolymerTs class implements interfaces, those implementations are currently lost
 * Behavior
 	* Behaviors are NOT transformed to a Mixin
-* @Listener
-	* If an element ID is not defined in the PolymerTs listener, we're currently adding `document` as the target. Should be `this` if a gesture event?
 * Polymer 1.0 Deprecated methods, properties and elements
 	* We don't currently change these to the Polymer 2.0 supported pattern(s)
 

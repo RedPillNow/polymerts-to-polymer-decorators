@@ -89,10 +89,6 @@
 							<li>Behaviors are NOT transformed to a Mixin</li>
 						</ul>
 					</li>
-					<li>@Listener<ul>
-							<li>If an element ID is not defined in the PolymerTs listener, we&#39;re currently adding <code>document</code> as the target. Should be <code>this</code> if a gesture event?</li>
-						</ul>
-					</li>
 					<li>Polymer 1.0 Deprecated methods, properties and elements<ul>
 							<li>We don&#39;t currently change these to the Polymer 2.0 supported pattern(s)</li>
 						</ul>
@@ -141,7 +137,7 @@ toPolymerDecorators.transformPolymerTs(<span class="hljs-string">'src/**/*.ts'</
 						<tr>
 							<td>outputPath</td>
 							<td>string</td>
-							<td>./polymerTsToPolymerDecoratorsOutput/</td>
+							<td>./polymerTsConvert/</td>
 							<td>The path where you want the converted files placed</td>
 						</tr>
 						<tr>
@@ -195,7 +191,7 @@ toPolymerDecorators.transformPolymerTs(<span class="hljs-string">'src/**/*.ts'</
 						<tr>
 							<td>glob</td>
 							<td>object</td>
-							<td>{<br />ignore:[<br />&#39;bower_components/<strong>/<em>.</em>&#39;,<br />&#39;node_modules/</strong>/<em>.</em>&#39;<br />]<br />}</td>
+							<td>{<br />ignore:[<br />&quot;bower_components/**/*.*&quot;,<br />&quot;node_modules/**/*.*&quot;<br />]<br />}</td>
 							<td>Files we should ignore</td>
 						</tr>
 						<tr>
