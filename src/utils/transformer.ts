@@ -431,13 +431,13 @@ export class PolymerTsTransformer {
 					let params: ts.Expression[] = [];
 					params.push(rpListener.eventDeclaration);
 					let elementId = rpListener.elementId;
-					if (!elementId && !rpListener.isGestureEvent) {
-						params.push(ts.createIdentifier('document'));
-					}else if (!elementId && rpListener.isGestureEvent) {
-						params.push(ts.createThis());
-					}else {
+					// if (!elementId && !rpListener.isGestureEvent) {
+					// 	params.push(ts.createIdentifier('document'));
+					// }else if (!elementId && rpListener.isGestureEvent) {
+					// 	params.push(ts.createThis());
+					// }else {
 						params.push(ts.createStringLiteral(rpListener.elementId));
-					}
+					// }
 					let newDecorator: ts.Decorator = this.updateDecorator(decorator, 'listen', params);
 					let newMethod = ts.updateMethod(
 						methodDecl,

@@ -33,7 +33,7 @@
 	"dependencies": {
 		"chalk": "^2.4.1",
 		"glob": "^7.1.2",
-		"polymerts-models": "file:../polymer-typescript-models",
+		"polymerts-models": "git+https://github.com/RedPillNow/polymerts-models.git",
 		"rimraf": "^2.6.2",
 		"typescript": "^2.9.2"
 	}
